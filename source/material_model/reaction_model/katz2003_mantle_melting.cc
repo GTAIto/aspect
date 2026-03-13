@@ -235,8 +235,22 @@ namespace aspect
                     // we want to make sure that this change does not lead to a negative porosity, see below).
                     // Later on, the overall porosity change is then divided again by the melting time scale
                     // to obtain the rate of melting or freezing, which is used in the operator splitting scheme.
-                    if (porosity_change < 0 )
+                    // We also allow the option to specify a no-freeze channel to allow melt to rise out of the top
+                    // of the model assuming porosity is initially and non-zero in the channel.  
+
+                    const double dx = in.position[i](0) - no_freeze_center_x;
+                    double dy = 0.0;
+                    if constexpr (dim == 3)
+                      dy = in.position[i](1) - no_freeze_center_y;
+
+                    const bool in_no_freeze_channel = (no_freeze_radius > 0.0) &&
+                      (this->get_geometry_model().depth(in.position[i]) <= no_freeze_bottom_depth) &&
+                      (dx*dx + dy*dy <= no_freeze_radius * no_freeze_radius);
+
+                    if (porosity_change < 0 && !in_no_freeze_channel)
                       porosity_change *= freezing_rate * melting_time_scale;
+                    else if (porosity_change < 0 && in_no_freeze_channel)
+                      porosity_change = 0.0;
                   }
 
                 // remove melt that gets close to the surface
@@ -474,6 +488,26 @@ namespace aspect
                            "which is done by a negative reaction term proportional to the "
                            "porosity field. "
                            "Units: \\si{\\meter}.");
+        prm.declare_entry ("No freeze channel center x", "0.0",
+                           Patterns::Double (),
+                           "The X coordinate of the axis of the cylindrical no-freeze channel. "
+                           "The channel is inactive when 'No freeze channel radius' is <= 0. "
+                           "Units: \\si{\\meter}.");
+        prm.declare_entry ("No freeze channel center y", "0.0",
+                           Patterns::Double (),
+                           "The Y coordinate of the axis of the cylindrical no-freeze channel. "
+                           "This is only used in three-dimensional models. "
+                           "Units: \\si{\\meter}.");
+        prm.declare_entry ("No freeze channel radius", "0.0",
+                           Patterns::Double (0.),
+                           "Radius of the cylindrical no-freeze channel in the horizontal plane. "
+                           "Freezing is prohibited inside the cylinder when this value is > 0. "
+                           "Units: \\si{\\meter}.");
+        prm.declare_entry ("No freeze channel bottom depth", "0.0",
+                           Patterns::Double (0.),
+                           "Depth from the surface down to the bottom of the no-freeze channel. "
+                           "The channel always extends upward from this depth to the surface, "
+                           "Units: \\si{\\meter}.");
         prm.declare_entry ("Melt compressibility", "0.0",
                            Patterns::Double (0.),
                            "The value of the compressibility of the melt. "
@@ -580,6 +614,10 @@ namespace aspect
         thermal_bulk_viscosity_exponent = prm.get_double ("Thermal bulk viscosity exponent");
         alpha_phi                  = prm.get_double ("Exponential melt weakening factor");
         extraction_depth           = prm.get_double ("Melt extraction depth");
+        no_freeze_center_x         = prm.get_double ("No freeze channel center x");
+        no_freeze_center_y         = prm.get_double ("No freeze channel center y");
+        no_freeze_radius           = prm.get_double ("No freeze channel radius");
+        no_freeze_bottom_depth     = prm.get_double ("No freeze channel bottom depth");
         melt_compressibility       = prm.get_double ("Melt compressibility");
         fractional_melting         = prm.get_bool ("Use fractional melting");
         freezing_rate              = prm.get_double ("Freezing rate");

@@ -119,6 +119,10 @@ namespace aspect
           double thermal_bulk_viscosity_exponent;
           double alpha_phi;
           double extraction_depth;
+          double no_freeze_center_x;
+          double no_freeze_center_y;
+          double no_freeze_radius;
+          double no_freeze_bottom_depth;
           double melt_compressibility;
           double melt_bulk_modulus_derivative;
           double depletion_solidus_change;
