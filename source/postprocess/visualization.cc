@@ -50,6 +50,35 @@ namespace aspect
     namespace
     {
       /**
+       * Helper class to output d(porosity)/dt at visualization output points,
+       * taken directly from the operator splitting reaction vector. G.Ito
+       */
+      template <int dim>
+      class DPorosityDtPostprocessor: public DataPostprocessorScalar<dim>, public SimulatorAccess<dim>
+      {
+        public:
+          DPorosityDtPostprocessor ()   //why not just use DatPostprocessor like below?
+            : DataPostprocessorScalar<dim> ("melting_rate", update_values)
+          {}
+
+          void
+          evaluate_vector_field (const DataPostprocessorInputs::Vector<dim> &input_data,
+                                 std::vector<Vector<double>> &computed_quantities) const override
+          {
+            const unsigned int porosity_component =
+              this->introspection().component_indices.compositional_fields
+              [this->introspection().compositional_index_for_name("porosity")];
+
+            const double dt = this->get_timestep();
+
+            for (unsigned int q = 0; q < input_data.solution_values.size(); ++q)
+              computed_quantities[q](0) = (dt > 0)
+                                          ? input_data.solution_values[q][porosity_component] / dt
+                                          : 0.0;
+          }
+      };
+
+      /**
        * This Postprocessor will generate the output variables of velocity,
        * pressure, temperature, and compositional fields. They can not be added
        * directly if the velocity needs to be converted from m/s to m/year, so
@@ -787,6 +816,17 @@ namespace aspect
       data_out.attach_dof_handler (this->get_dof_handler());
       data_out.add_data_vector (this->get_solution(),
                                 base_variables);
+      
+      // Output d(porosity)/dt from the operator splitting reaction vector.
+      std::unique_ptr<DPorosityDtPostprocessor<dim>> melting_rate_pp;
+      if (this->get_parameters().use_operator_splitting
+          && this->get_parameters().include_melt_transport
+          && this->get_timestep() > 0)
+        {
+          melting_rate_pp = std::make_unique<DPorosityDtPostprocessor<dim>>();
+          melting_rate_pp->initialize_simulator (this->get_simulator());
+          data_out.add_data_vector (this->get_reaction_vector(), *melting_rate_pp);
+        }
 
       // Also create an object for outputting information that lives on
       // the faces of the mesh.
