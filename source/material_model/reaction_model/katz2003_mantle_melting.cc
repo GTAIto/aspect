@@ -228,16 +228,7 @@ namespace aspect
 
                     porosity_change += freezing_amount;
 
-                    // Adapt time scale of freezing with respect to melting.
-                    // We have to multiply with the melting time scale here to obtain the porosity change
-                    // that happens in the time defined by the melting time scale (as opposed to a rate).
-                    // This is important because we want to perform some checks on this quantity (for example,
-                    // we want to make sure that this change does not lead to a negative porosity, see below).
-                    // Later on, the overall porosity change is then divided again by the melting time scale
-                    // to obtain the rate of melting or freezing, which is used in the operator splitting scheme.
-                    // We also allow the option to specify a no-freeze channel to allow melt to rise out of the top
-                    // of the model assuming porosity is initially and non-zero in the channel.  
-
+                    // optional no-freeze zone
                     const double dx = in.position[i](0) - no_freeze_center_x;
                     double dy = 0.0;
                     if constexpr (dim == 3)
@@ -246,6 +237,15 @@ namespace aspect
                     const bool in_no_freeze_channel = (no_freeze_radius > 0.0) &&
                       (this->get_geometry_model().depth(in.position[i]) <= no_freeze_bottom_depth) &&
                       (dx*dx + dy*dy <= no_freeze_radius * no_freeze_radius);
+
+
+                    // Adapt time scale of freezing with respect to melting.
+                    // We have to multiply with the melting time scale here to obtain the porosity change
+                    // that happens in the time defined by the melting time scale (as opposed to a rate).
+                    // This is important because we want to perform some checks on this quantity (for example,
+                    // we want to make sure that this change does not lead to a negative porosity, see below).
+                    // Later on, the overall porosity change is then divided again by the melting time scale
+                    // to obtain the rate of melting or freezing, which is used in the operator splitting scheme.
 
                     if (porosity_change < 0 && !in_no_freeze_channel)
                       porosity_change *= freezing_rate * melting_time_scale;
