@@ -2,10 +2,12 @@
 %
 % Run this script from the MATLAB command window or editor (F5).
 % Prompts for the .pvd file and field name.
-% If multiple timesteps are loaded and the mesh is consistent they are shown
-% in sequence (press any key to advance).
-% If the mesh changes across timesteps (AMR), each step uses its own mesh.
+% Timesteps are shown in sequence (press any key to advance).
 % Coordinates are converted from metres to km.
+%
+% Fields are interpolated onto a uniform rectilinear grid before plotting
+% (via interpolate_soln_to_regular_grid).  Set dx/dy below to override the
+% automatic grid spacing (default: 2nd-smallest cell dimension).
 
 % --- Prompt for PVD file ---
 % pvd_file = strtrim(input('Enter path to solution.pvd [solution.pvd]: ', 's'));
@@ -13,10 +15,31 @@
 pvd_file = 'solution.pvd';
 % end
 
-% --- Load data (also prompts for timestep selection) ---
-data = read_aspect_paraview_output(pvd_file);
+% --- Get timestep list and let user select which to plot ---
+t_yr_all = aspect_pvd_times(pvd_file);
+n_all    = numel(t_yr_all);
 
-fns = fieldnames(data);
+fprintf('Found %d timestep(s):\n', n_all);
+fprintf('  %6s  %s\n', 'Index', 'Simulation time (yr)');
+fprintf('  %6s  %s\n', '-----', '--------------------');
+for i = 1:n_all
+    fprintf('  %6d  %g\n', i, t_yr_all(i));
+end
+
+sel_str = strtrim(input( ...
+    sprintf('\nEnter timestep indices to plot (e.g. "all", "1", "2:5", "1:2:end") [all]: '), 's'));
+if isempty(sel_str) || strcmpi(sel_str, 'all')
+    sel = 1:n_all;
+else
+    sel_str = strrep(sel_str, 'end', num2str(n_all));
+    sel = round(eval(['[' sel_str ']']));
+end
+t_yr   = t_yr_all(sel);
+nsteps = numel(sel);
+
+% --- Load step 1 to discover available fields ---
+step1 = read_aspect_paraview_output(pvd_file, 1);
+fns = fieldnames(step1);
 fprintf('Available fields in data:\n');
 fprintf('  %s\n', fns{:});
 
@@ -25,111 +48,75 @@ if isempty(fieldname)
     fieldname = 'T';
 end
 
-if ~isfield(data, fieldname)
+if ~isfield(step1, fieldname)
     error('Field "%s" not found. Use one of the field names shown above.', fieldname);
 end
 
-% --- Streamline settings (edit these to adjust behaviour) ---
+% --- User settings ----------------------------------------------------------
+dx             = 250;         % m: regular grid x-spacing ([] = auto)
+dy             = 250;         % m: regular grid y-spacing ([] = auto)
 n_streamlines  = 20;          % number of streamlines
 sl_start_y     = 15000;       % seed y-level in metres
-sl_vel_field   = 'u_f';       % velocity field to use ('velocity' = solid, 'u_f' = fluid)
-n_grid_x       = 300;         % interpolation grid resolution in x
-n_grid_y       = 200;         % interpolation grid resolution in y
+sl_vel_field   = 'u_f';       % velocity field ('velocity' = solid, 'u_f' = fluid)
+% ---------------------------------------------------------------------------
 
-do_streamlines = isfield(data, sl_vel_field);
+do_streamlines = isfield(step1, sl_vel_field);
 if ~do_streamlines
     warning('plot_aspect_field:noVelocity', ...
         'Velocity field "%s" not found — streamlines will be skipped.', sl_vel_field);
 end
-
-varying_mesh = iscell(data.x);   % true when AMR changed mesh across steps
-field_all    = data.(fieldname);
-nsteps       = numel(data.times);
+clear step1;
 
 for s = 1:nsteps
-    t_val = data.times(min(s, numel(data.times)));
+    t_val = t_yr(s);
+    fprintf('Step %d/%d  (index %d,  t = %.4g yr)\n', s, nsteps, sel(s), t_val);
 
-    if varying_mesh
-        x_km  = data.x{s} / 1e3;
-        y_km  = data.y{s} / 1e3;
-        conn  = data.connectivity{s};
-        field = field_all{s};                          % [Npts x Ncomp] or [Npts x 1]
-        if do_streamlines; vel = data.(sl_vel_field){s}; else; vel = []; end
-    else
-        x_km = data.x / 1e3;
-        y_km = data.y / 1e3;
-        conn = data.connectivity;
-        if ndims(field_all) == 3
-            field = field_all(:,:,s);                  % vector, multi-step
-        elseif nsteps > 1
-            field = field_all(:, s);                   % scalar, multi-step
-        else
-            field = field_all;                         % single step (scalar or vector)
-        end
-        if do_streamlines
-            v_all = data.(sl_vel_field);
-            if ndims(v_all) == 3
-                vel = v_all(:,:,s);
-            else
-                vel = v_all;
-            end
-        else
-            vel = [];
-        end
-    end
+    step     = read_aspect_paraview_output(pvd_file, sel(s));
+    x_m      = step.x;
+    y_m      = step.y;
+    conn     = step.connectivity;
+    field_vg = step.(fieldname);
+    if do_streamlines; u_f_vg = step.(sl_vel_field); else; u_f_vg = []; end
 
     % If field has multiple components, plot its magnitude
-    if size(field, 2) > 1
+    if size(field_vg, 2) > 1
         plot_label = sprintf('|%s|  (m/yr)', fieldname);
-        field      = sqrt(sum(field.^2, 2));
+        field_vg   = sqrt(sum(field_vg.^2, 2));
     else
         plot_label = fieldname;
-        field      = field(:);
+        field_vg   = field_vg(:);
     end
 
-    % Warn if field is entirely NaN for this step (absent in source VTU)
-    if all(isnan(field))
+    if all(isnan(field_vg))
         warning('plot_aspect_field:fieldAllNaN', ...
-            'Field "%s" is all NaN at step %d (t = %.4g yr) — it may not have been written at this timestep.', ...
+            'Field "%s" is all NaN at step %d (t = %.4g yr).', ...
             plot_label, s, t_val);
     end
 
-    % Filter cells that have any non-finite vertex value
-    valid_cells = all(isfinite(field(conn)), 2);
-    fprintf('  Step %d/%d: plotting %d / %d cells (%d excluded: non-finite)\n', ...
-            s, nsteps, sum(valid_cells), numel(valid_cells), sum(~valid_cells));
+    % --- Interpolate field onto regular grid --------------------------------
+    [field, x, y] = interpolate_soln_to_regular_grid( ...
+                        field_vg, x_m, y_m, conn, dx, dy);
 
+    % --- Plot ---------------------------------------------------------------
     figure(1); clf;
     subplot(211)
-    patch('Faces',          conn(valid_cells, :), ...
-          'Vertices',        [x_km, y_km],         ...
-          'FaceVertexCData', field,                 ...
-          'FaceColor',       'interp',              ...
-          'EdgeColor',       'none',                ...
-          'LineWidth',       0.5)
-    colormap(jet)
 
-    % --- Streamlines ---
-    if do_streamlines && ~isempty(vel)
-        x_m = x_km * 1e3;   y_m = y_km * 1e3;
-        u_x = vel(:, 1);     u_y = vel(:, 2);
+    imagesc(x/1e3, y/1e3, field);
+    set(gca, 'YDir', 'normal');
+    colormap(jet);
 
-        % Interpolate scattered velocity onto a regular grid
-        xg = linspace(min(x_m), max(x_m), n_grid_x);
-        yg = linspace(min(y_m), max(y_m), n_grid_y);
-        [Xg, Yg] = meshgrid(xg, yg);
+    % --- Streamlines --------------------------------------------------------
+    if do_streamlines && ~isempty(u_f_vg)
+        [vel_rg, ~, ~] = interpolate_soln_to_regular_grid( ...
+                             u_f_vg, x_m, y_m, conn, dx, dy);
+        Ug = vel_rg(:,:,1);
+        Vg = vel_rg(:,:,2);
 
-        Fu = scatteredInterpolant(x_m, y_m, u_x, 'linear', 'none');
-        Fv = scatteredInterpolant(x_m, y_m, u_y, 'linear', 'none');
-        Ug = Fu(Xg, Yg);
-        Vg = Fv(Xg, Yg);
-
-        % Seed points at sl_start_y, evenly spaced across x
         sx = linspace(min(x_m), max(x_m), n_streamlines);
         sy = repmat(sl_start_y, 1, n_streamlines);
 
         hold on
-        h_sl = streamline(xg/1e3, yg/1e3, Ug, Vg, sx/1e3, sy/1e3);
+        h_sl = streamline(x/1e3, y/1e3, Ug, Vg, sx/1e3, sy/1e3);
         set(h_sl, 'Color', 'w', 'LineWidth', 0.5);
         hold off
     end
@@ -141,7 +128,6 @@ for s = 1:nsteps
 
     cb = colorbar('Location', 'eastoutside');
     cb.Label.String = plot_label;
-    %clim([-1e-14 1e-14])
 
     drawnow
 
