@@ -19,24 +19,26 @@
 %   porosity     — melt fraction         [Npts x 1]
 %   melting_rate — d(phi)/dt             [Npts x 1]
 %
-% REQUIRES: read_aspect_output.m on the MATLAB path.
+% REQUIRES: read_aspect_paraview_output.m on the MATLAB path.
 clear;
 
 %% ---- User settings --------------------------------------------------------
 % NOTE: ASPECT outputs velocity in m/yr and coordinates in m.
 %       Flux units in this script are therefore m^2/yr.
 %       dporosity_dt is in yr^-1 (divided by timestep in years in postprocess).
-vel_field   = 'fluid_velocity'; % melt velocity field name (m/yr)
+vel_field   = 'u_f';            % melt velocity field name (m/yr)
 phi_field   = 'porosity';       % porosity (melt fraction) field name
 dmdt_field  = 'dporosity_dt';   % d(phi)/dt field name (yr^-1)
-uy_thresh   = 1e-4;             % m/yr: threshold for "upward melt" at top boundary
+uy_thresh   = 0.1;             % m/yr: threshold for "upward melt" at top boundary
 sl_ds_frac  = 1/500;            % streamline step size as fraction of domain height
+seconds_per_year= 60*60*24*365.25;
 
 %% ---- Load data ------------------------------------------------------------
-pvd_file = strtrim(input('Enter path to solution.pvd [solution.pvd]: ', 's'));
-if isempty(pvd_file), pvd_file = 'solution.pvd'; end
+pvd_file = 'solution.pvd'
+%pvd_file = strtrim(input('Enter path to solution.pvd [solution.pvd]: ', 's'));
+%if isempty(pvd_file), pvd_file = 'solution.pvd'; end
 
-data   = read_aspect_output(pvd_file);
+data   = read_aspect_paraview_output(pvd_file);
 nsteps = numel(data.times);
 vm     = iscell(data.x);       % true when AMR changed mesh between timesteps
 t_yr   = data.times;           % ASPECT writes time in years
@@ -56,10 +58,6 @@ end
 flux_top  = nan(nsteps, 1);   % (1) m^2/s  melt flux through top
 gen_below = nan(nsteps, 1);   % (3) m^2/s  integrated d(phi)/dt in source region
 
-%% ---- Colormap: blue-white-red for d(phi)/dt -------------------------------
-nc = 128;
-cmap_bwr = [linspace(0,1,nc/2)', linspace(0,1,nc/2)', ones(nc/2,1); ...
-             ones(nc/2,1), linspace(1,0,nc/2)', linspace(1,0,nc/2)'];
 
 %% ---- Initialise figure ----------------------------------------------------
 hfig = figure(3);  clf(hfig);
@@ -82,6 +80,7 @@ for s = 1:nsteps
         phi  = slice_field(data.(phi_field),  s);
         dmdt = slice_field(data.(dmdt_field), s);
     end
+    dmdt=dmdt.*seconds_per_year; 
 
     u_x = vel(:,1);   u_y = vel(:,2);
 
@@ -137,14 +136,14 @@ for s = 1:nsteps
     % Plot all computed steps up to and including s
     idx = 1:s;
     hl1 = plot(ax1, t_yr(idx), flux_top(idx),  'b-o', ...
-               'MarkerSize', 3, 'LineWidth', 1.5, 'DisplayName', 'Top flux');
+               'MarkerSize', 3, 'LineWidth', 0.5, 'DisplayName', 'Top flux');
     hl2 = plot(ax1, t_yr(idx), gen_below(idx), 'r-o', ...
-               'MarkerSize', 3, 'LineWidth', 1.5, 'DisplayName', 'Gen. below streamline');
+               'MarkerSize', 3, 'LineWidth', 0.5, 'DisplayName', 'Gen. below streamline');
 
     % Highlight the current step with filled markers
-    plot(ax1, t_yr(s), flux_top(s),  'bs', 'MarkerSize', 9, ...
+    plot(ax1, t_yr(s), flux_top(s),  'bs', 'MarkerSize', 7, ...
          'MarkerFaceColor', 'b', 'HandleVisibility', 'off');
-    plot(ax1, t_yr(s), gen_below(s), 'rs', 'MarkerSize', 9, ...
+    plot(ax1, t_yr(s), gen_below(s), 'gs', 'MarkerSize', 7, ...
          'MarkerFaceColor', 'r', 'HandleVisibility', 'off');
 
     % Fix x-axis to full time range so the plot doesn't rescale
@@ -159,7 +158,14 @@ for s = 1:nsteps
     % ======================================================================
     % SUBPLOT (212): cross-section of d(phi)/dt + streamline
     % ======================================================================
-    ax2 = subplot(2,1,2);
+    % ---- Colormap: blue-white-red for d(phi)/dt -------------------------------
+    nc = 128;
+    cmap = [linspace(0,1,nc/2)', linspace(0,1,nc/2)', ones(nc/2,1); ...
+             ones(nc/2,1), linspace(1,0,nc/2)', linspace(1,0,nc/2)'];
+    clim_val = max(abs(dmdt));
+    clim_val = 1e-14*seconds_per_year;
+
+    ax2 = subplot(212);
     cla(ax2);  hold(ax2, 'on');
 
     x_km = x / 1e3;   y_km = y / 1e3;
@@ -169,11 +175,7 @@ for s = 1:nsteps
     patch(ax2, 'Faces', conn(valid,:), 'Vertices', [x_km, y_km], ...
           'FaceVertexCData', dmdt, 'FaceColor', 'interp', 'EdgeColor', 'none');
 
-    colormap(ax2, cmap_bwr);
-
-    % Symmetric colour limits centred on zero
-    clim_val = max(abs(dmdt));
-    if clim_val == 0 || ~isfinite(clim_val),  clim_val = 1;  end
+    colormap(ax2, cmap);
     caxis(ax2, [-clim_val, clim_val]);
 
     cb = colorbar(ax2, 'Location', 'eastoutside');
@@ -181,7 +183,7 @@ for s = 1:nsteps
 
     % Overlay the feeder-zone boundary streamline
     if size(sl, 1) >= 2
-        plot(ax2, sl(:,1)/1e3, sl(:,2)/1e3, 'k-',  'LineWidth', 2);
+        plot(ax2, sl(:,1)/1e3, sl(:,2)/1e3, 'k-',  'LineWidth', 0.5);
         plot(ax2, sl(1,1)/1e3, sl(1,2)/1e3, 'kv',  ...
              'MarkerSize', 8, 'MarkerFaceColor', 'k');   % start marker at top
     end

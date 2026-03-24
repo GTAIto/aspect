@@ -1,9 +1,9 @@
-function varargout = read_aspect_output(pvd_file, output_mat_file)
-%READ_ASPECT_OUTPUT  Read ASPECT Paraview VTU output and save to a .mat file.
+function varargout = read_aspect_paraview_output(pvd_file, output_mat_file)
+%READ_ASPECT_PARAVIEW_OUTPUT  Read ASPECT Paraview VTU output and save to a .mat file.
 %
 % USAGE:
-%   read_aspect_output('solution.pvd')
-%   read_aspect_output('path/to/solution.pvd', 'output.mat')
+%   read_aspect_paraview_output('solution.pvd')
+%   read_aspect_paraview_output('path/to/solution.pvd', 'output.mat')
 %
 % INPUT:
 %   pvd_file        - path to the .pvd index file (e.g. 'output/solution.pvd')
@@ -37,13 +37,7 @@ function varargout = read_aspect_output(pvd_file, output_mat_file)
 %   data.cell_types   [Ncells x 1]  VTK cell type codes
 %   data.temperature  [Npts x Nsteps]        (scalar field example)
 %   data.velocity     [Npts x Ndim x Nsteps] (vector field example)
-%   data.vs_x         [Npts x Nsteps]  solid velocity x-component
-%   data.vs_y         [Npts x Nsteps]  solid velocity y-component
-%   data.vs_z         [Npts x Nsteps]  solid velocity z-component (0 in 2-D)
-%   data.uf_x         [Npts x Nsteps]  fluid velocity x-component
-%   data.uf_y         [Npts x Nsteps]  fluid velocity y-component
-%   data.uf_z         [Npts x Nsteps]  fluid velocity z-component (0 in 2-D)
-%   ...one field per Paraview output variable...
+%   ...one field per Paraview output variable, using the names from the VTU files...
 %
 % For a single selected timestep the trailing Nsteps dimension is absent.
 %
@@ -57,6 +51,8 @@ function varargout = read_aspect_output(pvd_file, output_mat_file)
 %   - ASPECT default output is zlib-compressed binary, which this handles
 %   - Connectivity is converted from 0-based (VTK) to 1-based (MATLAB)
 %   - Uses -v7.3 mat format to support files larger than 2 GB
+%   - Field names are taken directly from the VTU file (with non-alphanumeric
+%     characters replaced by underscores to form valid MATLAB field names)
 
     narginchk(1, 2);
     returning_data = (nargout > 0);
@@ -90,12 +86,12 @@ function varargout = read_aspect_output(pvd_file, output_mat_file)
         try
             sel = eval(['[' sel_str ']']);
         catch
-            error('read_aspect_output:badSelection', ...
+            error('read_aspect_paraview_output:badSelection', ...
                   'Could not parse selection "%s". Use MATLAB index notation.', sel_str);
         end
         sel = round(sel);
         if any(sel < 1) || any(sel > n_steps)
-            error('read_aspect_output:outOfRange', ...
+            error('read_aspect_paraview_output:outOfRange', ...
                   'Index out of range. Valid range is 1 to %d.', n_steps);
         end
     end
@@ -175,7 +171,7 @@ function varargout = read_aspect_output(pvd_file, output_mat_file)
         % the simulation starts generating melt.
         empty_mask = cellfun(@isempty, slices);
         if any(empty_mask)
-            warning('read_aspect_output:missingField', ...
+            warning('read_aspect_paraview_output:missingField', ...
                 'Field "%s" absent in %d of %d timestep(s) — those steps will be NaN.', ...
                 fn, sum(empty_mask), nsteps);
             ref = find(~empty_mask, 1);
@@ -204,10 +200,6 @@ function varargout = read_aspect_output(pvd_file, output_mat_file)
             out.(fn) = slices;                         % {[Npts_i x Ncomp], ...}
         end
     end
-
-    % --- Split solid and fluid velocity into named component fields ---
-    out = split_velocity_components(out, 'velocity',       'vs');
-    out = split_velocity_components(out, 'u_f',            'uf');
 
     if returning_data
         % Return the struct directly — no file written
@@ -366,12 +358,6 @@ function ts = read_vtu(vtu_file)
     end
 
     % --- Diagnostics ---
-    [~, vtu_name, vtu_ext] = fileparts(vtu_file);
-    x_range = [min(ts.coordinates(:,1)) max(ts.coordinates(:,1))] / 1e3;
-    y_range = [min(ts.coordinates(:,2)) max(ts.coordinates(:,2))] / 1e3;
-    % fprintf('    %s%s: %d internal piece(s), %d nodes, x=[%.1f %.1f] km, y=[%.1f %.1f] km\n', ...
-    %         vtu_name, vtu_ext, n_vtu_pieces, size(ts.coordinates,1), ...
-    %         x_range(1), x_range(2), y_range(1), y_range(2));
     fn_list = fieldnames(ts);
     for k = 1:numel(fn_list)
         fn = fn_list{k};
@@ -412,7 +398,7 @@ function vals = read_da(da_node, is_le, hdr_type, use_zlib)
     end
 
     if strcmpi(fmt, 'appended')
-        error('read_aspect_output:appended', ...
+        error('read_aspect_paraview_output:appended', ...
               'Appended format VTU not supported. Set ASPECT output format to binary or ascii.');
     end
 
@@ -563,7 +549,7 @@ function vals = bytes_to_double(bytes, type_str, is_le)
         case 'uint32',  v = typecast(bytes, 'uint32');
         case 'uint64',  v = typecast(bytes, 'uint64');
         otherwise
-            warning('read_aspect_output:unknownType', ...
+            warning('read_aspect_paraview_output:unknownType', ...
                     'Unknown VTK type "%s"; treating as float64.', type_str);
             v = typecast(bytes, 'double');
     end
@@ -571,29 +557,6 @@ function vals = bytes_to_double(bytes, type_str, is_le)
         v = swapbytes(v);
     end
     vals = double(v(:));
-end
-
-%% =========================================================================
-function out = split_velocity_components(out, src_field, prefix)
-% Split a vector velocity field into _x/_y/_z scalar fields.
-% src_field : name of the existing struct field (e.g. 'velocity')
-% prefix    : output prefix (e.g. 'vs' -> vs_x, vs_y, vs_z)
-    if ~isfield(out, src_field), return; end
-    v = out.(src_field);
-    suffixes = {'x', 'y', 'z'};
-    if iscell(v)
-        % Varying mesh across timesteps: cell array of [Npts_i x Ncomp]
-        ncomp = size(v{1}, 2);
-        for d = 1:min(ncomp, 3)
-            out.([prefix '_' suffixes{d}]) = cellfun(@(m) m(:,d), v, 'UniformOutput', false);
-        end
-    else
-        % Consistent mesh: [Npts x Ncomp] (1 step) or [Npts x Ncomp x Nsteps]
-        ncomp = size(v, 2);
-        for d = 1:min(ncomp, 3)
-            out.([prefix '_' suffixes{d}]) = squeeze(v(:,d,:));  % [Npts x Nsteps] or [Npts x 1]
-        end
-    end
 end
 
 %% =========================================================================
