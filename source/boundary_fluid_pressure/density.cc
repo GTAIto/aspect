@@ -156,8 +156,10 @@ namespace aspect
           else if (prm.get ("Density formulation") == "average density")
             density_formulation = DensityFormulation::average_density;
           else if (prm.get ("Density formulation") == "weighted density")
+        {
             density_formulation = DensityFormulation::weighted_density;
             fluid_density_weight = prm.get_double ("Fluid density weight");
+          }
           else
             AssertThrow (false, ExcNotImplemented());
         }
