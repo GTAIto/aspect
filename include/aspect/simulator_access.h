@@ -223,7 +223,7 @@ namespace aspect
        * Destructor. Does nothing but is virtual so that derived classes
        * destructors are also virtual.
        */
-      virtual ~SimulatorAccess () = default;
+      virtual ~SimulatorAccess ();
 
       /**
        * Initialize this class for a given simulator. This function is marked
@@ -359,6 +359,15 @@ namespace aspect
        */
       std::string
       get_output_directory () const;
+
+      /**
+       * Return the ID of the checkpoint that ASPECT is currently writing or was last
+       * written, depending on where this function gets called. Can be used in plugins
+       * to override the save() function and synchronize the checkpointing of plugins
+       * with the main ASPECT checkpoint.
+       */
+      unsigned int
+      get_checkpoint_id () const;
 
       /**
        * Return whether we use the adiabatic heating term.
@@ -1081,7 +1090,7 @@ namespace aspect
       /**
        * A pointer to the simulator object to which we want to get access.
        */
-      const Simulator<dim> *simulator;
+      ObserverPointer<const Simulator<dim>, SimulatorAccess<dim>> simulator;
   };
 }
 

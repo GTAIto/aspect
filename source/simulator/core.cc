@@ -21,6 +21,7 @@
 
 #include <aspect/simulator.h>
 #include <aspect/global.h>
+#include <aspect/linear_algebra_types.h>
 #include <aspect/utilities.h>
 #include <aspect/melt.h>
 #include <aspect/advection_field.h>
@@ -1107,13 +1108,9 @@ namespace aspect
     system_matrix.clear ();
 
     const Table<2,DoFTools::Coupling> coupling = setup_system_matrix_coupling();
-    LinearAlgebra::BlockDynamicSparsityPattern sp;
 
-    sp.reinit (system_partitioning,
-               system_partitioning,
-               introspection.index_sets.system_relevant_partitioning,
-               mpi_communicator);
-
+    const auto &system_relevant_partitioning = introspection.index_sets.system_relevant_partitioning;
+    LinearAlgebra::BlockDynamicSparsityPattern dsp(system_relevant_partitioning);
 
     if ((parameters.use_discontinuous_temperature_discretization) ||
         (parameters.have_discontinuous_composition_discretization) ||
@@ -1154,8 +1151,9 @@ namespace aspect
           }
 
         DoFTools::make_flux_sparsity_pattern (dof_handler,
-                                              sp,
-                                              current_constraints, false,
+                                              dsp,
+                                              current_constraints,
+                                              false,
                                               coupling,
                                               face_coupling,
                                               Utilities::MPI::
@@ -1178,11 +1176,12 @@ namespace aspect
                 composition_coupling[component][component] = coupling[component][component];
 
                 const unsigned int block = introspection.block_indices.compositional_field_sparsity_pattern[first_c];
-                sp.block(block,block).reinit(sp.block(block,block).locally_owned_range_indices(),
-                                             sp.block(block,block).locally_owned_domain_indices());
+                dsp.block(block,block).reinit(system_relevant_partitioning[block].size(),
+                                              system_relevant_partitioning[block].size(),
+                                              system_relevant_partitioning[block]);
 
                 DoFTools::make_flux_sparsity_pattern (dof_handler,
-                                                      sp,
+                                                      dsp,
                                                       current_constraints, true,
                                                       composition_coupling,
                                                       face_coupling,
@@ -1194,8 +1193,10 @@ namespace aspect
     else
       {
         DoFTools::make_sparsity_pattern (dof_handler,
-                                         coupling, sp,
-                                         current_constraints, false,
+                                         coupling,
+                                         dsp,
+                                         current_constraints,
+                                         false,
                                          Utilities::MPI::
                                          this_mpi_process(mpi_communicator));
 
@@ -1215,18 +1216,19 @@ namespace aspect
             composition_coupling[component][component] = coupling[component][component];
 
             const unsigned int block = introspection.get_components_to_blocks()[component];
-            sp.block(block,block).reinit(sp.block(block,block).locally_owned_range_indices(),
-                                         sp.block(block,block).locally_owned_domain_indices());
+            dsp.block(block,block).reinit(system_relevant_partitioning[block].size(),
+                                          system_relevant_partitioning[block].size(),
+                                          system_relevant_partitioning[block]);
 
             DoFTools::make_sparsity_pattern (dof_handler,
-                                             composition_coupling, sp,
-                                             current_constraints, true,
+                                             composition_coupling,
+                                             dsp,
+                                             current_constraints,
+                                             true,
                                              Utilities::MPI::
                                              this_mpi_process(mpi_communicator));
           }
       }
-
-    sp.compress();
 
     // We may only allocate some of the matrix blocks, but the sparsity pattern
     // will still create entries for hanging nodes and boundary conditions.
@@ -1244,16 +1246,18 @@ namespace aspect
               continue;
 
             const unsigned int block = introspection.get_components_to_blocks()[i];
-
-            // TODO: using clear() would be nice here but clear() also resets the
-            // size, so just reinit():
-            sp.block(block,block).reinit(sp.block(block,block).locally_owned_range_indices(),
-                                         sp.block(block,block).locally_owned_domain_indices());
-            sp.block(block,block).compress();
+            dsp.block(block,block).reinit(system_relevant_partitioning[block].size(),
+                                          system_relevant_partitioning[block].size(),
+                                          system_relevant_partitioning[block]);
           }
       }
 
-    system_matrix.reinit (sp);
+    SparsityTools::distribute_sparsity_pattern(dsp,
+                                               dof_handler.locally_owned_dofs(),
+                                               mpi_communicator,
+                                               introspection.index_sets.system_relevant_set);
+
+    system_matrix.reinit (system_partitioning, dsp, mpi_communicator);
   }
 
 
@@ -1323,21 +1327,15 @@ namespace aspect
     // its sparsity pattern here -- the corresponding entries of
     // 'coupling' simply remain at DoFTools::none
 
-    LinearAlgebra::BlockDynamicSparsityPattern sp;
-
-    sp.reinit (system_partitioning,
-               system_partitioning,
-               introspection.index_sets.system_relevant_partitioning,
-               mpi_communicator);
+    LinearAlgebra::BlockDynamicSparsityPattern dsp(introspection.index_sets.system_relevant_partitioning);
 
     DoFTools::make_sparsity_pattern (dof_handler,
-                                     coupling, sp,
-                                     current_constraints, false,
+                                     coupling,
+                                     dsp,
+                                     current_constraints,
+                                     false,
                                      Utilities::MPI::
                                      this_mpi_process(mpi_communicator));
-
-
-    sp.compress();
 
     // We are not interested in temperature and composition matrices for the
     // preconditioner matrix. But even though we specify a coupling of
@@ -1346,25 +1344,27 @@ namespace aspect
     // unnecessary, so we remove those entries here.
     {
       // temperature:
-      const unsigned int block_idx = introspection.block_indices.temperature;
-      // TODO: using clear() would be nice here but clear() also resets the
-      // size, so just reinit():
-      sp.block(block_idx, block_idx).reinit(sp.block(block_idx, block_idx).locally_owned_range_indices(),
-                                            sp.block(block_idx, block_idx).locally_owned_domain_indices());
-      sp.block(block_idx, block_idx).compress();
+      const unsigned int block = introspection.block_indices.temperature;
+      dsp.block(block,block).reinit(system_partitioning[block].size(),
+                                    system_partitioning[block].size(),
+                                    system_partitioning[block]);
     }
     // compositions:
     for (unsigned int c=0; c<introspection.n_compositional_fields; ++c)
       {
-        const unsigned int block_idx = introspection.block_indices.compositional_fields[c];
-        // TODO: using clear() would be nice here but clear() also resets the
-        // size, so just reinit():
-        sp.block(block_idx, block_idx).reinit(sp.block(block_idx, block_idx).locally_owned_range_indices(),
-                                              sp.block(block_idx, block_idx).locally_owned_domain_indices());
-        sp.block(block_idx, block_idx).compress();
+        const unsigned int block = introspection.block_indices.compositional_fields[c];
+        dsp.block(block,block).reinit(system_partitioning[block].size(),
+                                      system_partitioning[block].size(),
+                                      system_partitioning[block]);
       }
 
-    system_preconditioner_matrix.reinit (sp);
+    SparsityTools::distribute_sparsity_pattern(dsp,
+                                               dof_handler.locally_owned_dofs(),
+                                               mpi_communicator,
+                                               introspection.index_sets.system_relevant_set);
+
+    system_preconditioner_matrix.reinit (system_partitioning, dsp, mpi_communicator);
+
     if (parameters.use_bfbt)
       inverse_lumped_mass_matrix.reinit(introspection.index_sets.stokes_partitioning);
   }
@@ -2137,9 +2137,9 @@ namespace aspect
     // start-up
     if (parameters.resume_computation == true)
       {
-        last_checkpoint_id = determine_last_good_snapshot();
+        last_checkpoint_id = determine_resume_snapshot();
         AssertThrow(last_checkpoint_id != numbers::invalid_unsigned_int,
-                    ExcMessage("You requested to restart the simulation from the last checkpoint but no written checkpoint has been found."));
+                    ExcMessage("You requested to restart the simulation from a checkpoint, but no matching written checkpoint has been found."));
 
         resume_from_snapshot();
         // we need to remove additional_refinement_times that are in the past

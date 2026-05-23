@@ -30,14 +30,23 @@
 
 DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 
-#include <deal.II/lac/generic_linear_algebra.h>
-
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 
 DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
 #include <boost/container/small_vector.hpp>
+
+#ifdef ASPECT_USE_TPETRA
+#include <deal.II/lac/trilinos_tpetra_vector.h>
+#include <deal.II/lac/trilinos_tpetra_block_vector.h>
+#include <deal.II/lac/trilinos_tpetra_sparse_matrix.h>
+#include <deal.II/lac/trilinos_tpetra_block_sparse_matrix.h>
+#else
+#include <deal.II/lac/trilinos_sparse_matrix.h>
+#include <deal.II/lac/trilinos_block_sparse_matrix.h>
+#endif
+
 
 #include <aspect/compat.h>
 
@@ -257,9 +266,32 @@ namespace aspect
    */
   namespace LinearAlgebra
   {
+#ifdef ASPECT_USE_TPETRA
     /**
      * Typedef for the vector type used.
      */
+    using Vector = dealii::LinearAlgebra::TpetraWrappers::Vector<double>;
+
+    /**
+     * Typedef for the type used to describe vectors that consist of multiple
+     * blocks.
+     */
+    using BlockVector = dealii::LinearAlgebra::TpetraWrappers::BlockVector<double>;
+
+    /**
+     * Typedef for the sparse matrix type used.
+     */
+    using SparseMatrix = dealii::LinearAlgebra::TpetraWrappers::SparseMatrix<double>;
+
+    /**
+     * Typedef for the type used to describe sparse matrices that consist of
+     * multiple blocks.
+     */
+    using BlockSparseMatrix = dealii::LinearAlgebra::TpetraWrappers::BlockSparseMatrix<double>;
+#else
+    /**
+    * Typedef for the vector type used.
+    */
     using Vector = dealii::TrilinosWrappers::MPI::Vector;
 
     /**
@@ -278,45 +310,7 @@ namespace aspect
      * multiple blocks.
      */
     using BlockSparseMatrix = dealii::TrilinosWrappers::BlockSparseMatrix;
-
-    /**
-     * Typedef for the base class for all preconditioners.
-     */
-    using PreconditionBase = dealii::TrilinosWrappers::PreconditionBase;
-
-    /**
-     * Typedef for the AMG preconditioner type used for the top left block of
-     * the Stokes matrix.
-     */
-    using PreconditionAMG = dealii::TrilinosWrappers::PreconditionAMG;
-
-    /**
-     * Typedef for the Incomplete Cholesky preconditioner used for other
-     * blocks of the system matrix.
-     */
-    using PreconditionIC = dealii::TrilinosWrappers::PreconditionIC;
-
-    /**
-     * Typedef for the Incomplete LU decomposition preconditioner used for
-     * other blocks of the system matrix.
-     */
-    using PreconditionILU = dealii::TrilinosWrappers::PreconditionILU;
-
-    /**
-     * Typedef for the Jacobi preconditioner used for free surface velocity
-     * projection.
-     */
-    using PreconditionJacobi = dealii::TrilinosWrappers::PreconditionJacobi;
-
-    /**
-     * Typedef for the block compressed sparsity pattern type.
-     */
-    using BlockDynamicSparsityPattern = dealii::TrilinosWrappers::BlockSparsityPattern;
-
-    /**
-     * Typedef for the compressed sparsity pattern type.
-     */
-    using DynamicSparsityPattern = dealii::TrilinosWrappers::SparsityPattern;
+#endif
   }
 
   /**

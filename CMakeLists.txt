@@ -94,6 +94,7 @@ endif()
 # Some other ASPECT configuration options:
 set(ASPECT_MAX_NUM_PARTICLE_SYSTEMS 2 CACHE STRING "The maximum number of particle systems supported at runtime.")
 
+set(ASPECT_USE_TPETRA OFF CACHE BOOL "If ON, use Tpetra classes of Trilinos. Requires a suitable Trilinos and deal.II.")
 
 
 # ##############################################################################
@@ -122,6 +123,29 @@ if(NOT ${deal.II_FOUND})
 endif()
 
 message(STATUS "Found deal.II version ${DEAL_II_PACKAGE_VERSION} at '${deal.II_DIR}'")
+
+if (ASPECT_USE_TPETRA)
+  message(STATUS "Using ASPECT_USE_TPETRA = '${ASPECT_USE_TPETRA}'")
+
+  if (NOT DEAL_II_TRILINOS_WITH_TPETRA OR NOT DEAL_II_TRILINOS_WITH_TPETRA_MUELU)
+      message(SEND_ERROR
+        "\n-- deal.II was built without support for Tpetra!\n"
+        )
+      set(_DEALII_GOOD OFF)
+  endif()
+
+  if (NOT ${DEAL_II_PACKAGE_VERSION} VERSION_GREATER_EQUAL 9.8.0)
+    message(SEND_ERROR
+          "\n-- Tpetra support is only available for deal.II versions greater or equal to 9.8.0!\n"
+          )
+        set(_DEALII_GOOD OFF)
+  endif()
+
+  message(SEND_ERROR
+      "\n-- Tpetra support is not yet complete. Only remove this check if you want to test Tpetra support.\n"
+      )
+    set(_DEALII_GOOD OFF)
+endif()
 
 set(_DEALII_GOOD ON)
 
@@ -586,7 +610,7 @@ configure_file(
 
 file(GLOB_RECURSE ASPECT_SOURCE_FILES_CC CONFIGURE_DEPENDS "source/*.cc")
 list(REMOVE_ITEM  ASPECT_SOURCE_FILES_CC ${CMAKE_CURRENT_SOURCE_DIR}/source/main.cc)
-file(GLOB_RECURSE ASPECT_SOURCE_FILES_H CONFIGURE_DEPENDS  "include/*.h")
+file(GLOB_RECURSE ASPECT_SOURCE_FILES_H CONFIGURE_DEPENDS  "include/aspect/*.h")
 file(GLOB_RECURSE ASPECT_UNIT_TEST_FILES CONFIGURE_DEPENDS "unit_tests/*.cc" "contrib/catch/catch.hpp")
 set(ASPECT_MAIN_FILE "source/main.cc")
 
@@ -1050,6 +1074,14 @@ add_custom_target(indent
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   COMMAND ./contrib/utilities/indent
   COMMENT "Indenting all ASPECT header and source files..."
+  )
+
+# Provide "parameters" target for updating the parameter documentation
+add_custom_target(parameters
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/doc
+  COMMAND ./update_parameters.sh ${CMAKE_BINARY_DIR}/aspect
+  DEPENDS ${TARGET_EXE}
+  COMMENT "Updating parameter documentation..."
   )
 
 # Provide "release" and "debug" targets to switch compile mode

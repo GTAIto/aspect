@@ -117,7 +117,7 @@ The model is compressible only if this is specified in the input file, and conta
 
 &lsquo;multicomponent compressible&rsquo;: This model is for use with an arbitrary number of compositional fields, where each field represents a rock type which can have completely different properties from the others. Each rock type is described by a self-consistent equation of state.  The value of the  compositional field is interpreted as a mass fraction. If the sum of the fields is greater than one, they are renormalized.  If it is less than one, material properties  for &ldquo;background mantle&rdquo; make up the rest. When more than one field is present, the material properties are averaged arithmetically by mass fraction (for specific heat), or volume fraction (for density, thermal expansivity and compressibility). The thermal conductivity is also arithmetically averaged by volume fraction. Finally, the viscosity is averaged by volume fraction, but the user can choose between arithmetic, harmonic, geometric or maximum composition averaging.
 
-&lsquo;nondimensional&rsquo;: A material model for nondimensionalized computations for compressible or incompressible computations defined through Rayleigh number   ext{Ra} and Dissipation number Di. This model is made to be used with the Boussinesq, ALA, or TALA formulation.
+&lsquo;nondimensional&rsquo;: A material model for nondimensionalized computations for compressible or incompressible computations defined through Rayleigh number $\text{Ra}$ and Dissipation number Di. This model is made to be used with the Boussinesq, ALA, or TALA formulation.
 
 The viscosity is defined as $\eta = \text{Di} / \text{Ra} \cdot \exp(-b T^\prime + c z)$ where $T^\prime$ is the temperature variation from the adiabatic temperature, $z$ is the depth, $b$ is given by &ldquo;Viscosity temperature prefactor&rdquo;, and $c$ by &ldquo;Viscosity depth prefactor&rdquo;. If $\text{Di}$ is zero, it will be replaced by 1.0 in $\eta$.
 
@@ -200,7 +200,7 @@ Viscous stress may also be limited by a non-linear stress limiter that has a for
 
  The value for the components of this formula and additional parameters are read from the parameter file in subsection  &rsquo;Material model/Visco Plastic&rsquo;.
 
-&lsquo;viscoelastic&rsquo;: An implementation of a simple linear viscoelastic rheology that only includes the deviatoric components of elasticity. Specifically, the viscoelastic rheology only takes into account the elastic shear strength (e.g., shear modulus), while the tensile and volumetric strength (e.g., Young&rsquo;s and bulk modulus) are not considered. The model is incompressible and allows specifying an arbitrary number of compositional fields, where each field represents a different rock type or component of the viscoelastic stress tensor. The stress tensor in 2d and 3d, respectively, contains 3 or 6 components. The compositional fields representing these components must be named and listed in a very specific format, which is designed to minimize mislabeling stress tensor components as distinct &rsquo;compositional rock types&rsquo; (or vice versa). For 2d models, the first six compositional fields must be labeled &rsquo;stress\_xx&rsquo;, &rsquo;stress\_yy&rsquo; and &rsquo;stress\_xy&rsquo;, &rsquo;stress\_xx\_old&rsquo;, &rsquo;stress\_yy\_old&rsquo; and &rsquo;stress\_xy\_old&rsquo;, In 3d, the first twelve compositional fields must be labeled &rsquo;stress\_xx&rsquo;, &rsquo;stress\_yy&rsquo;, &rsquo;stress\_zz&rsquo;, &rsquo;stress\_xy&rsquo;, &rsquo;stress\_xz&rsquo;, &rsquo;stress\_yz&rsquo;, &rsquo;stress\_xx\_old&rsquo;, &rsquo;stress\_yy\_old&rsquo;, &rsquo;stress\_zz\_old&rsquo;, &rsquo;stress\_xy\_old&rsquo;, &rsquo;stress\_xz\_old&rsquo;, &rsquo;stress\_yz\_old&rsquo;.
+&lsquo;viscoelastic&rsquo;: An implementation of a simple linear viscoelastic rheology that only includes the deviatoric components of elasticity. Specifically, the viscoelastic rheology only takes into account the elastic shear strength (e.g., shear modulus), while the tensile and volumetric strength (e.g., Young&rsquo;s and bulk modulus) are not considered. The model is incompressible and allows specifying an arbitrary number of compositional fields, where each field represents a different rock type or component of the viscoelastic stress tensor. The stress tensor in 2d and 3d, respectively, contains 3 or 6 components. The compositional fields representing these components must be named and listed in a very specific format, which is designed to minimize mislabeling stress tensor components as distinct &rsquo;compositional rock types&rsquo; (or vice versa). For 2d models, the first six compositional fields of type stress must be labeled &rsquo;ve\_stress\_xx&rsquo;, &rsquo;ve\_stress\_yy&rsquo; and &rsquo;ve\_stress\_xy&rsquo;, &rsquo;ve\_stress\_xx\_old&rsquo;, &rsquo;ve\_stress\_yy\_old&rsquo; and &rsquo;ve\_stress\_xy\_old&rsquo;, In 3d, the first twelve compositional fields of type stress must be labeled &rsquo;ve\_stress\_xx&rsquo;, &rsquo;ve\_stress\_yy&rsquo;, &rsquo;ve\_stress\_zz&rsquo;, &rsquo;ve\_stress\_xy&rsquo;, &rsquo;ve\_stress\_xz&rsquo;, &rsquo;ve\_stress\_yz&rsquo;, &rsquo;ve\_stress\_xx\_old&rsquo;, &rsquo;ve\_stress\_yy\_old&rsquo;, &rsquo;ve\_stress\_zz\_old&rsquo;,  &rsquo;ve\_stress\_xy\_old&rsquo;, &rsquo;ve\_stress\_xz\_old&rsquo;, &rsquo;ve\_stress\_yz\_old&rsquo;.
 
  Expanding the model to include non-linear viscous flow (e.g., diffusion/dislocation creep) and plasticity would produce a constitutive relationship commonly referred to as partial elastoviscoplastic (e.g., pEVP) in the geodynamics community. While extensively discussed and applied within the geodynamics literature, notable references include: Moresi et al. (2003), J. Comp. Phys., v. 184, p. 476-497. Gerya and Yuen (2007), Phys. Earth. Planet. Inter., v. 163, p. 83-105. Gerya (2010), Introduction to Numerical Geodynamic Modeling. Kaus (2010), Tectonophysics, v. 484, p. 36-47. Choi et al. (2013), J. Geophys. Res., v. 118, p. 2429-2444. Keller et al. (2013), Geophys. J. Int., v. 195, p. 1406-1442.
 
@@ -5104,7 +5104,7 @@ Note that melt does not freeze unless the &rsquo;Freezing rate&rsquo; parameter 
 
 **Pattern:** [List of <[Double 0...MAX_DOUBLE (inclusive)]> of length 0...4294967295 (inclusive)]
 
-**Documentation:** The minimum water content for the HK04 olivine hydration viscosity prefactor scheme. This acts as the cutoff between &rsquo;dry&rsquo; creep and &rsquo;wet&rsquo; creep for olivine, and the default value is chosen based on the value reported by Hirth & Kohlstaedt 2004. For a mass fraction of bound water beneath this value, this value is used instead to compute the water fugacity. Units: \si{\kg} / \si{\kg} %.
+**Documentation:** The minimum water content for the HK04 olivine hydration viscosity prefactor scheme. This acts as the cutoff between &rsquo;dry&rsquo; creep and &rsquo;wet&rsquo; creep for olivine, and the default value is chosen based on the value reported by Hirth & Kohlstedt 2004. For a mass fraction of bound water beneath this value, this value is used instead to compute the water fugacity. Units: \si{\kg} / \si{\kg} %.
 ::::
 
 ::::{dropdown} __Parameter:__ {ref}`Minimum strain rate<parameters:Material_20model/Visco_20Plastic/Minimum_20strain_20rate>`
@@ -5610,7 +5610,7 @@ If a compositional field named &rsquo;noninitial\_plastic\_strain&rsquo; is incl
 
 **Pattern:** [Selection none|HK04 olivine hydration ]
 
-**Documentation:** Select what type of viscosity multiplicative prefactor scheme to apply. Allowed entries are &rsquo;none&rsquo;, and &rsquo;HK04 olivine hydration&rsquo;. HK04 olivine hydration calculates the viscosity change due to hydrogen incorporation into olivine following Hirth & Kohlstaedt 2004 (10.1029/138GM06). none does not modify the viscosity. Units: none.
+**Documentation:** Select what type of viscosity multiplicative prefactor scheme to apply. Allowed entries are &rsquo;none&rsquo;, and &rsquo;HK04 olivine hydration&rsquo;. HK04 olivine hydration calculates the viscosity change due to hydrogen incorporation into olivine following Hirth & Kohlstedt 2004 (10.1029/138GM06). none does not modify the viscosity. Units: none.
 ::::
 
 ::::{dropdown} __Parameter:__ {ref}`Viscosity ratios for Frank Kamenetskii<parameters:Material_20model/Visco_20Plastic/Viscosity_20ratios_20for_20Frank_20Kamenetskii>`
@@ -5704,20 +5704,20 @@ If the function you are describing represents a vector-valued function with mult
 ## **Subsection:** Material model / Visco Plastic / Grain boundary sliding
 ::::{dropdown} __Parameter:__ {ref}`Activation energies for grain boundary sliding<parameters:Material_20model/Visco_20Plastic/Grain_20boundary_20sliding/Activation_20energies_20for_20grain_20boundary_20sliding>`
 :name: parameters:Material_20model/Visco_20Plastic/Grain_20boundary_20sliding/Activation_20energies_20for_20grain_20boundary_20sliding
-**Default value:** 49
+**Default value:** 49e3
 
 **Pattern:** [Anything]
 
-**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001for T > 262 k.Units: \si{\joule\per\mole}.
+**Documentation:** Here we use the default values for ice at T < 255 K as given in Goldsby & Kohlstedt, 2001. Units: \si{\joule\per\mole}.
 ::::
 
 ::::{dropdown} __Parameter:__ {ref}`Activation volumes for grain boundary sliding<parameters:Material_20model/Visco_20Plastic/Grain_20boundary_20sliding/Activation_20volumes_20for_20grain_20boundary_20sliding>`
 :name: parameters:Material_20model/Visco_20Plastic/Grain_20boundary_20sliding/Activation_20volumes_20for_20grain_20boundary_20sliding
-**Default value:** 13e-6
+**Default value:** -13e-6
 
 **Pattern:** [Anything]
 
-**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001.Units: \si{\meter\cubed\per\mole}.
+**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001. Units: \si{\meter\cubed\per\mole}.
 ::::
 
 ::::{dropdown} __Parameter:__ {ref}`Grain size<parameters:Material_20model/Visco_20Plastic/Grain_20boundary_20sliding/Grain_20size>`
@@ -5726,7 +5726,7 @@ If the function you are describing represents a vector-valued function with mult
 
 **Pattern:** [Double 0...MAX_DOUBLE (inclusive)]
 
-**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001.Units: \si{\meter}.
+**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001. Units: \si{\meter}.
 ::::
 
 ::::{dropdown} __Parameter:__ {ref}`Grain size exponents for grain boundary sliding<parameters:Material_20model/Visco_20Plastic/Grain_20boundary_20sliding/Grain_20size_20exponents_20for_20grain_20boundary_20sliding>`
@@ -5735,16 +5735,16 @@ If the function you are describing represents a vector-valued function with mult
 
 **Pattern:** [Anything]
 
-**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001.
+**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001. Units: None.
 ::::
 
 ::::{dropdown} __Parameter:__ {ref}`Prefactors for grain boundary sliding<parameters:Material_20model/Visco_20Plastic/Grain_20boundary_20sliding/Prefactors_20for_20grain_20boundary_20sliding>`
 :name: parameters:Material_20model/Visco_20Plastic/Grain_20boundary_20sliding/Prefactors_20for_20grain_20boundary_20sliding
-**Default value:** 3.9e-19.2
+**Default value:** 6.2e-14
 
 **Pattern:** [Anything]
 
-**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001
+**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001. Units: \si{\pascal}$^{-n_{\text{grain boundary sliding}}}$ \si{\meter}$^{m_{\text{grain boundary sliding}}}$ \si{\per\second}.
 ::::
 
 ::::{dropdown} __Parameter:__ {ref}`Stress exponents for grain boundary sliding<parameters:Material_20model/Visco_20Plastic/Grain_20boundary_20sliding/Stress_20exponents_20for_20grain_20boundary_20sliding>`
@@ -5753,7 +5753,7 @@ If the function you are describing represents a vector-valued function with mult
 
 **Pattern:** [List of <[Double 0...MAX_DOUBLE (inclusive)]> of length 0...4294967295 (inclusive)]
 
-**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001.
+**Documentation:** Here we use the default values for ice as given in Goldsby & Kohlstedt, 2001. Units: None.
 ::::
 
 (parameters:Material_20model/Viscoelastic)=

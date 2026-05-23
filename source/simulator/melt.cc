@@ -20,16 +20,20 @@
 
 
 #include <aspect/melt.h>
+#include <aspect/linear_algebra_types.h>
 #include <aspect/advection_field.h>
 #include <aspect/utilities.h>
+#include <aspect/linear_algebra_types.h>
+
 #include <aspect/mesh_deformation/interface.h>
 #include <aspect/gravity_model/interface.h>
 #include <aspect/boundary_traction/interface.h>
 #include <aspect/simulator/assemblers/advection.h>
-#include <deal.II/base/signaling_nan.h>
 
+#include <deal.II/base/signaling_nan.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/lac/sparsity_tools.h>
+#include <deal.II/lac/solver_cg.h>
 
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_dgp.h>
@@ -1255,9 +1259,13 @@ namespace aspect
       LinearAlgebra::PreconditionAMG preconditioner;
       LinearAlgebra::PreconditionAMG::AdditionalData Amg_data;
 
+#ifndef ASPECT_USE_TPETRA
+      // Constant modes were never implemented, but probably should be
       // Amg_data.constant_modes = constant_modes;
-      Amg_data.elliptic = true;
       Amg_data.higher_order_elements = false;
+#endif
+
+      Amg_data.elliptic = true;
       Amg_data.smoother_sweeps = 2;
       Amg_data.aggregation_threshold = 0.02;
       preconditioner.initialize(system_matrix.block(block_idx, block_idx));
