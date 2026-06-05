@@ -229,14 +229,8 @@ namespace aspect
                     porosity_change += freezing_amount;
 
                     // optional no-freeze zone
-                    const double dx = in.position[i](0) - no_freeze_center_x;
-                    double dy = 0.0;
-                    if constexpr (dim == 3)
-                      dy = in.position[i](1) - no_freeze_center_y;
-
-                    const bool in_no_freeze_channel = (no_freeze_radius > 0.0) &&
-                      (this->get_geometry_model().depth(in.position[i]) <= no_freeze_bottom_depth) &&
-                      (dx*dx + dy*dy <= no_freeze_radius * no_freeze_radius);
+                    
+                    const bool in_no_freeze_channel = (no_freeze_channel_indicator_function.value(in.position[i]) > 0.5);
 
 
                     // Adapt time scale of freezing with respect to melting.
@@ -340,23 +334,29 @@ namespace aspect
                 melt_out->compaction_viscosities[i] = xi_0 * phi_0 / porosity;
 
                 double visc_temperature_dependence = 1.0;
-                if (this->include_adiabatic_heating ())
-                  {
-                    const double delta_temp = in.temperature[i]-this->get_adiabatic_conditions().temperature(in.position[i]);
-                    visc_temperature_dependence = std::max(std::min(std::exp(-thermal_bulk_viscosity_exponent*delta_temp/this->get_adiabatic_conditions().temperature(in.position[i])),1e4),1e-4);
-                  }
-                else
-                  {
-                    const double delta_temp = in.temperature[i]-reference_T;
-                    const double T_dependence = (thermal_bulk_viscosity_exponent == 0.0
-                                                 ?
-                                                 0.0
-                                                 :
-                                                 thermal_bulk_viscosity_exponent*delta_temp/reference_T);
-                    visc_temperature_dependence = std::max(std::min(std::exp(-T_dependence),1e4),1e-4);
-                  }
+
+                const bool in_no_freeze_channel = (no_freeze_channel_indicator_function.value(in.position[i]) > 0.5);
+                if (!in_no_freeze_channel)
+                {
+                    if (this->include_adiabatic_heating ())
+                    {
+                        const double delta_temp = in.temperature[i]-this->get_adiabatic_conditions().temperature(in.position[i]);
+                        visc_temperature_dependence = std::max(std::min(std::exp(-thermal_bulk_viscosity_exponent*delta_temp/this->get_adiabatic_conditions().temperature(in.position[i])),1e4),1e-4);
+                    }
+                    else
+                    {
+                        const double delta_temp = in.temperature[i]-reference_T;
+                        const double T_dependence = (thermal_bulk_viscosity_exponent == 0.0
+                                                    ?
+                                                    0.0
+                                                    :
+                                                    thermal_bulk_viscosity_exponent*delta_temp/reference_T);
+                        visc_temperature_dependence = std::max(std::min(std::exp(-T_dependence),1e4),1e-4);
+                    }
+                }
                 melt_out->compaction_viscosities[i] *= visc_temperature_dependence;
               }
+        
           }
 
         if (this->include_melt_transport() && in.requests_property(MaterialProperties::viscosity))
@@ -488,26 +488,6 @@ namespace aspect
                            "which is done by a negative reaction term proportional to the "
                            "porosity field. "
                            "Units: \\si{\\meter}.");
-        prm.declare_entry ("No freeze channel center x", "0.0",
-                           Patterns::Double (),
-                           "The X coordinate of the axis of the cylindrical no-freeze channel. "
-                           "The channel is inactive when 'No freeze channel radius' is <= 0. "
-                           "Units: \\si{\\meter}.");
-        prm.declare_entry ("No freeze channel center y", "0.0",
-                           Patterns::Double (),
-                           "The Y coordinate of the axis of the cylindrical no-freeze channel. "
-                           "This is only used in three-dimensional models. "
-                           "Units: \\si{\\meter}.");
-        prm.declare_entry ("No freeze channel radius", "0.0",
-                           Patterns::Double (0.),
-                           "Radius of the cylindrical no-freeze channel in the horizontal plane. "
-                           "Freezing is prohibited inside the cylinder when this value is > 0. "
-                           "Units: \\si{\\meter}.");
-        prm.declare_entry ("No freeze channel bottom depth", "0.0",
-                           Patterns::Double (0.),
-                           "Depth from the surface down to the bottom of the no-freeze channel. "
-                           "The channel always extends upward from this depth to the surface, "
-                           "Units: \\si{\\meter}.");
         prm.declare_entry ("Melt compressibility", "0.0",
                            Patterns::Double (0.),
                            "The value of the compressibility of the melt. "
@@ -584,6 +564,11 @@ namespace aspect
                            "Reference permeability of the solid host rock."
                            "Units: \\si{\\meter\\squared}.");
 
+        prm.enter_subsection("No freeze indicator function");
+        {
+            Functions::ParsedFunction<dim>::declare_parameters(prm, 1);
+        }
+        prm.leave_subsection(); 
 
       }
 
@@ -614,10 +599,6 @@ namespace aspect
         thermal_bulk_viscosity_exponent = prm.get_double ("Thermal bulk viscosity exponent");
         alpha_phi                  = prm.get_double ("Exponential melt weakening factor");
         extraction_depth           = prm.get_double ("Melt extraction depth");
-        no_freeze_center_x         = prm.get_double ("No freeze channel center x");
-        no_freeze_center_y         = prm.get_double ("No freeze channel center y");
-        no_freeze_radius           = prm.get_double ("No freeze channel radius");
-        no_freeze_bottom_depth     = prm.get_double ("No freeze channel bottom depth");
         melt_compressibility       = prm.get_double ("Melt compressibility");
         fractional_melting         = prm.get_bool ("Use fractional melting");
         freezing_rate              = prm.get_double ("Freezing rate");
@@ -626,6 +607,22 @@ namespace aspect
         depletion_solidus_change   = prm.get_double ("Depletion solidus change");
         reference_permeability     = prm.get_double ("Reference permeability");
 
+        prm.enter_subsection("No freeze indicator function");
+        {
+            try
+            {
+                no_freeze_channel_indicator_function.parse_parameters(prm);
+            }
+            catch (...)
+            {
+                std::cerr << "ERROR: FunctionParser failed to parse\n"
+                          << "\t'No freeze channel indicator function'\n"
+                          << "with expression\n"
+                          << "\t'" << prm.get("Function expression") << "'";
+                throw;
+            }
+          }
+        prm.leave_subsection();
 
         if (this->convert_output_to_years() == true)
           {

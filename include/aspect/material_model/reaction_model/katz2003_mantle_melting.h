@@ -25,6 +25,7 @@
 #include <aspect/simulator_access.h>
 #include <aspect/postprocess/melt_statistics.h>
 #include <aspect/melt.h>
+#include <deal.II/base/parsed_function.h>
 
 namespace aspect
 {
@@ -119,10 +120,6 @@ namespace aspect
           double thermal_bulk_viscosity_exponent;
           double alpha_phi;
           double extraction_depth;
-          double no_freeze_center_x;
-          double no_freeze_center_y;
-          double no_freeze_radius;
-          double no_freeze_bottom_depth;
           double melt_compressibility;
           double melt_bulk_modulus_derivative;
           double depletion_solidus_change;
@@ -130,6 +127,7 @@ namespace aspect
           double freezing_rate;
           double melting_time_scale;
           double reference_permeability;
+          Functions::ParsedFunction<dim> no_freeze_channel_indicator_function;
 
           // for the solidus temperature
           double A1;   // °C
