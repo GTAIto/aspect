@@ -1890,6 +1890,7 @@ namespace aspect
 
     // Now apply constraints (boundary conditions and others) to the new solution vector.
     current_constraints.distribute (distributed_vector);
+    constraints.distribute(distributed_reaction_vector);
 
     // put the final values into the solution vector
     for (unsigned int c=0; c<introspection.n_compositional_fields; ++c)

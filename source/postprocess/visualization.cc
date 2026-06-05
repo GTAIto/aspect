@@ -818,19 +818,14 @@ namespace aspect
                                 base_variables);
       
       // Output d(porosity)/dt from the operator splitting reaction vector.
-      // Declared outside the if-block so it outlives build_patches() below.
       std::unique_ptr<DPorosityDtPostprocessor<dim>> melting_rate_pp;
-      LinearAlgebra::BlockVector constrained_reaction_vector;
       if (this->get_parameters().use_operator_splitting
           && this->get_parameters().include_melt_transport
           && this->get_timestep() > 0)
         {
           melting_rate_pp = std::make_unique<DPorosityDtPostprocessor<dim>>();
           melting_rate_pp->initialize_simulator (this->get_simulator());
-          constrained_reaction_vector = this->get_reaction_vector();
-          this->get_current_constraints().distribute(constrained_reaction_vector);
-          data_out.add_data_vector (constrained_reaction_vector, *melting_rate_pp);
-
+          data_out.add_data_vector (this->get_reaction_vector(), *melting_rate_pp);
         }
 
       // Also create an object for outputting information that lives on
