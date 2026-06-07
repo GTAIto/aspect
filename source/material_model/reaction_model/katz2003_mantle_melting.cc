@@ -366,6 +366,13 @@ namespace aspect
                 const double porosity = std::min(1.0, std::max(in.composition[i][porosity_idx],0.0));
                 out.viscosities[i] *= std::exp(- alpha_phi * porosity);
               }
+            // Override shear viscosity in no-freeze channel if requested
+           if (channel_shear_viscosity > 0)
+             {
+               for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
+               if (no_freeze_channel_indicator_function.value(in.position[i]) > 0.5)
+                  out.viscosities[i] = channel_shear_viscosity;
+             }
           }
       }
 
@@ -564,9 +571,13 @@ namespace aspect
                            "Reference permeability of the solid host rock."
                            "Units: \\si{\\meter\\squared}.");
 
-        prm.enter_subsection("No freeze indicator function");
-        {
-            Functions::ParsedFunction<dim>::declare_parameters(prm, 1);
+        prm.enter_subsection ("No freeze channel indicator function");
+        {     
+          Functions::ParsedFunction<dim>::declare_parameters(prm, 1);
+          prm.declare_entry ("Channel shear viscosity", "-1", Patterns::Double(),
+                      "Shear viscosity prescribed inside the no-freeze channel. "
+                      "A value of -1 (default) leaves the viscosity unchanged. "
+                      "Units: Pa s.");
         }
         prm.leave_subsection(); 
 
@@ -607,20 +618,21 @@ namespace aspect
         depletion_solidus_change   = prm.get_double ("Depletion solidus change");
         reference_permeability     = prm.get_double ("Reference permeability");
 
-        prm.enter_subsection("No freeze indicator function");
-        {
+        prm.enter_subsection("No freeze channel indicator function");
+          {
             try
-            {
+              {
                 no_freeze_channel_indicator_function.parse_parameters(prm);
-            }
+              }
             catch (...)
-            {
+              {
                 std::cerr << "ERROR: FunctionParser failed to parse\n"
                           << "\t'No freeze channel indicator function'\n"
                           << "with expression\n"
                           << "\t'" << prm.get("Function expression") << "'";
                 throw;
-            }
+              }
+            channel_shear_viscosity = prm.get_double("Channel shear viscosity");
           }
         prm.leave_subsection();
 
