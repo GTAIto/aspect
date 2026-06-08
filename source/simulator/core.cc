@@ -68,6 +68,7 @@
 #endif
 #include <deal.II/distributed/grid_refinement.h>
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <locale>
@@ -235,6 +236,7 @@ namespace aspect
     timestep_number (numbers::invalid_unsigned_int),
     nonlinear_iteration (numbers::invalid_unsigned_int),
     nonlinear_solver_failures (0),
+    linear_solver_failures (0),
 
     triangulation (mpi_communicator, smoothing_flags<dim>(parameters.stokes_gmg_type == Parameters<dim>::StokesGMGType::global_coarsening), settings(parameters)),
 
@@ -472,7 +474,15 @@ namespace aspect
     postprocess_manager.initialize_simulator (*this);
     postprocess_manager.parse_parameters (prm);
 
-    if (postprocess_manager.template has_matching_active_plugin<Postprocess::Particles<dim>>())
+    const bool particles_are_needed =
+      postprocess_manager.template has_matching_active_plugin<Postprocess::Particles<dim>>()
+      ||
+      (std::find (parameters.compositional_field_methods.begin(),
+                  parameters.compositional_field_methods.end(),
+                  Parameters<dim>::AdvectionFieldMethod::particles)
+       != parameters.compositional_field_methods.end());
+
+    if (particles_are_needed)
       {
         particle_managers.resize(parameters.n_particle_managers);
 
@@ -2325,6 +2335,9 @@ namespace aspect
     // we disable automatic summary printing so that it won't happen when
     // throwing an exception. Therefore, we have to do this manually here:
     computing_timer.print_summary ();
+
+    if (linear_solver_failures > 0)
+      pcout << "\nWARNING: During this computation " << linear_solver_failures << " linear solver failures occurred!" << std::endl;
 
     if (nonlinear_solver_failures > 0)
       pcout << "\nWARNING: During this computation " << nonlinear_solver_failures << " nonlinear solver failures occurred!" << std::endl;
