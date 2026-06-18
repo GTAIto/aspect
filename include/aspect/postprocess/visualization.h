@@ -177,6 +177,18 @@ namespace aspect
           virtual
           std::list<std::string>
           required_other_postprocessors () const;
+          
+          /**
+           * A function that indicates whether this visualization postprocessor
+           * requires the operator splitting reaction vector rather than the
+           * solution vector as input to evaluate_vector_field(). The default
+           * implementation returns false. Derived classes that need the
+           * reaction vector (e.g., to compute melting rates) should override
+           * this function to return true.
+           */
+          virtual
+          bool
+          needs_reaction_vector () const;
 
         private:
           /**
