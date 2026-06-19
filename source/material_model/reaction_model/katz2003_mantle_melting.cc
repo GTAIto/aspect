@@ -336,25 +336,31 @@ namespace aspect
                 double visc_temperature_dependence = 1.0;
 
                 const bool in_no_freeze_channel = (no_freeze_channel_indicator_function.value(in.position[i]) > 0.5);
-                if (!in_no_freeze_channel)
+                const bool apply_temp_dependence = !in_no_freeze_channel || (channel_min_T_comp_visc > 0.0);
+
+                if (apply_temp_dependence)
                 {
+                    const double eff_Temp = in_no_freeze_channel
+                          ? std::max(in.temperature[i], channel_min_T_comp_visc)
+                          : in.temperature[i];
+
                     if (this->include_adiabatic_heating ())
                     {
-                        const double delta_temp = in.temperature[i]-this->get_adiabatic_conditions().temperature(in.position[i]);
+                        const double delta_temp = eff_Temp-this->get_adiabatic_conditions().temperature(in.position[i]);
                         visc_temperature_dependence = std::max(std::min(std::exp(-thermal_bulk_viscosity_exponent*delta_temp/this->get_adiabatic_conditions().temperature(in.position[i])),1e4),1e-4);
                     }
                     else
                     {
-                        const double delta_temp = in.temperature[i]-reference_T;
+                        const double delta_temp = eff_Temp-reference_T;
                         const double T_dependence = (thermal_bulk_viscosity_exponent == 0.0
-                                                    ?
-                                                    0.0
-                                                    :
-                                                    thermal_bulk_viscosity_exponent*delta_temp/reference_T);
+                                                   ?
+                                                   0.0
+                                                   :
+                                                   thermal_bulk_viscosity_exponent*delta_temp/reference_T);
                         visc_temperature_dependence = std::max(std::min(std::exp(-T_dependence),1e4),1e-4);
                     }
+                    melt_out->compaction_viscosities[i] *= visc_temperature_dependence;
                 }
-                melt_out->compaction_viscosities[i] *= visc_temperature_dependence;
               }
         
           }
@@ -366,6 +372,13 @@ namespace aspect
                 const double porosity = std::min(1.0, std::max(in.composition[i][porosity_idx],0.0));
                 out.viscosities[i] *= std::exp(- alpha_phi * porosity);
               }
+            // Override shear viscosity in no-freeze channel if requested
+           if (channel_shear_viscosity > 0)
+             {
+               for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
+               if (no_freeze_channel_indicator_function.value(in.position[i]) > 0.5)
+                  out.viscosities[i] = channel_shear_viscosity;
+             }
           }
       }
 
@@ -564,9 +577,20 @@ namespace aspect
                            "Reference permeability of the solid host rock."
                            "Units: \\si{\\meter\\squared}.");
 
-        prm.enter_subsection("No freeze indicator function");
-        {
-            Functions::ParsedFunction<dim>::declare_parameters(prm, 1);
+        prm.enter_subsection ("No freeze channel indicator function");
+        {     
+          Functions::ParsedFunction<dim>::declare_parameters(prm, 1);
+          prm.declare_entry ("Channel shear viscosity", "-1", Patterns::Double(),
+                      "Shear viscosity prescribed inside the no-freeze channel. "
+                      "A value of -1 (default) leaves the viscosity unchanged. "
+                      "Units: Pa s.");
+          prm.declare_entry ("Channel minimum compaction viscosity temperature", "-1.0",
+            Patterns::Double(),
+            "Minimum temperature (in K) used for the compaction viscosity temperature "
+            "dependence inside the no-freeze channel.  Compaction viscosity can "
+            "get no larger than that set by this temperature to ensure the matrix"
+            "can gain porosity even in the lithosphere.  A value of -1 (default) "
+            "removes the temperature dependence entirely.");
         }
         prm.leave_subsection(); 
 
@@ -607,20 +631,23 @@ namespace aspect
         depletion_solidus_change   = prm.get_double ("Depletion solidus change");
         reference_permeability     = prm.get_double ("Reference permeability");
 
-        prm.enter_subsection("No freeze indicator function");
-        {
+        prm.enter_subsection("No freeze channel indicator function");
+          {
             try
-            {
+              {
                 no_freeze_channel_indicator_function.parse_parameters(prm);
-            }
+              }
             catch (...)
-            {
+              {
                 std::cerr << "ERROR: FunctionParser failed to parse\n"
                           << "\t'No freeze channel indicator function'\n"
                           << "with expression\n"
                           << "\t'" << prm.get("Function expression") << "'";
                 throw;
-            }
+              }
+            channel_shear_viscosity = prm.get_double("Channel shear viscosity");
+            channel_min_T_comp_visc = prm.get_double("Channel minimum compaction viscosity temperature");
+
           }
         prm.leave_subsection();
 

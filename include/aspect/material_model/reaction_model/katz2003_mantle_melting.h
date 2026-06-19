@@ -128,6 +128,9 @@ namespace aspect
           double melting_time_scale;
           double reference_permeability;
           Functions::ParsedFunction<dim> no_freeze_channel_indicator_function;
+          double channel_shear_viscosity;
+          double channel_min_T_comp_visc;
+
 
           // for the solidus temperature
           double A1;   // °C
