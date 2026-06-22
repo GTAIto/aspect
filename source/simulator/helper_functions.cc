@@ -1891,7 +1891,9 @@ namespace aspect
     // Now apply constraints (boundary conditions and others) to the new solution vector.
     current_constraints.distribute (distributed_vector);
 
-    // Apply hanging node constraints but not Dirichet bcs, while preserving periodic bcs
+    // Apply hanging node constraints and periodic boundary conditions,
+    // but no other boundary conditions (because this vector is going to be
+    // added to vectors already containing those).
     constraints.distribute(distributed_reaction_vector);
 
     // put the final values into the solution vector
