@@ -131,6 +131,8 @@ namespace aspect
           double channel_shear_viscosity;
           double channel_min_T_comp_visc;
           double channel_min_T_melting;
+          double channel_porosity_for_permeability;
+
 
 
           // for the solidus temperature

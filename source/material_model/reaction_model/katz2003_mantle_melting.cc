@@ -309,9 +309,14 @@ namespace aspect
             for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
               {
                 double porosity = std::max(in.composition[i][porosity_idx],0.0);
+                // if in the magma exit channel, permeability is constant, bulk viscosity has an upper limit based input temperature, and shear viscosity can be set
+                const bool in_magma_exit_channel = (magma_exit_channel_indicator_function.value(in.position[i]) > 0.5);
 
                 melt_out->fluid_viscosities[i] = viscosity_fluid;
-                melt_out->permeabilities[i] = reference_permeability * Utilities::fixed_power<3>(porosity) * Utilities::fixed_power<2>(1.0-porosity);
+                const double perm_porosity = (in_magma_exit_channel && channel_porosity_for_permeability > 0)
+                              ? channel_porosity_for_permeability
+                              : porosity;
+                melt_out->permeabilities[i] = reference_permeability * Utilities::fixed_power<3>(perm_porosity) * Utilities::fixed_power<2>(1.0-perm_porosity);
 
                 // first, calculate temperature dependence of density
                 double temperature_dependence = 1.0;
@@ -341,7 +346,6 @@ namespace aspect
 
                 double visc_temperature_dependence = 1.0;
 
-                const bool in_magma_exit_channel = (magma_exit_channel_indicator_function.value(in.position[i]) > 0.5);
                 const bool apply_temp_dependence = !in_magma_exit_channel || (channel_min_T_comp_visc > 0.0);
 
                 if (apply_temp_dependence)
@@ -378,7 +382,7 @@ namespace aspect
                 const double porosity = std::min(1.0, std::max(in.composition[i][porosity_idx],0.0));
                 out.viscosities[i] *= std::exp(- alpha_phi * porosity);
               }
-            // Override shear viscosity in no-freeze channel if requested
+            // Override shear viscosity in magma exit channel if requested
            if (channel_shear_viscosity > 0)
              {
                for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
@@ -602,6 +606,12 @@ namespace aspect
                              "Minimum temperature (K) required for melting inside the magma exit "
                              "channel. Below this temperature, no melting occurs. "
                              "A value of -1 (default) suppresses melting everywhere in the channel.");
+          prm.declare_entry ("Channel porosity for permeability", "-1.0",
+                             Patterns::Double(),
+                             "Permeability inside the magma exit channel is held constant at the "
+                             "value k0*phi_c^3*(1-phi_c)^2, where phi_c is this porosity. A value "
+                             "of -1 (default) uses the local porosity normally.");
+
         }
         prm.leave_subsection(); 
 
@@ -659,6 +669,7 @@ namespace aspect
             channel_shear_viscosity = prm.get_double("Channel shear viscosity");
             channel_min_T_comp_visc = prm.get_double("Channel minimum compaction viscosity temperature");
             channel_min_T_melting = prm.get_double("Channel minimum temperature for melting");
+            channel_porosity_for_permeability = prm.get_double("Channel porosity for permeability");
 
           }
         prm.leave_subsection();
