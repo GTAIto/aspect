@@ -127,13 +127,11 @@ namespace aspect
           double freezing_rate;
           double melting_time_scale;
           double reference_permeability;
-          Functions::ParsedFunction<dim> magma_exit_channel_indicator_function;
-          double channel_shear_viscosity;
-          double channel_min_T_comp_visc;
-          double channel_min_T_melting;
+          Functions::ParsedFunction<dim> magma_extraction_channel_indicator_function;
+          double channel_base_temperature; 
           double channel_porosity_for_permeability;
-
-
+          double channel_porosity_for_compaction_viscosity;
+          double channel_shear_viscosity;
 
           // for the solidus temperature
           double A1;   // °C
