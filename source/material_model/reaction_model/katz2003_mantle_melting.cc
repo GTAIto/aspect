@@ -667,7 +667,7 @@ namespace aspect
             channel_porosity_for_permeability = prm.get_double("Channel porosity for permeability");
             channel_porosity_for_compaction_viscosity = prm.get_double("Channel porosity for compaction viscosity");
             channel_shear_viscosity = prm.get_double("Channel shear viscosity");
-            const bool channel_is_active = (Utilities::trim_copy(prm.get("Function expression")) != "0");
+            const bool channel_is_active = (prm.get("Function expression") != "0");
             AssertThrow(!channel_is_active || channel_base_temperature >= 0.0,
                 ExcMessage("'Channel base temperature' must be set to define the base of the channel")); 
 
