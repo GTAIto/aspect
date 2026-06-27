@@ -101,13 +101,14 @@ namespace aspect
                     const double depth  = this->get_geometry_model().depth(material_model_inputs.position[q]);
                     const double P_lith = interpolate_lith_pressure(depth);
                     const double rho_l  = melt_outputs->fluid_densities[q];
-                    // (grad p_f)·n_outward = -dp_f/dx = (P_lith - rho_l*g*z) / dx
-                    fluid_pressure_gradient_outputs[q] =side_pressure_gradient_weight* (P_lith - rho_l * gravity.norm() * depth) / extraction_dx;
+                    // (grad p_f)·n_outward should be negative for outward flux 
+                    fluid_pressure_gradient_outputs[q] =-side_pressure_gradient_weight* (P_lith - rho_l * gravity.norm() * depth) / extraction_dx;
                   }
                 else
                   {
-                    fluid_pressure_gradient_outputs[q] =0;
+                    fluid_pressure_gradient_outputs[q] = (melt_outputs->fluid_densities[q] * gravity) * normal_vectors[q];
                   }
+
                 break;
               }
 
