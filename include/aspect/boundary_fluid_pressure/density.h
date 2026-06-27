@@ -54,6 +54,8 @@ namespace aspect
           const std::vector<Tensor<1,dim>> &normal_vectors,
           std::vector<double> &fluid_pressure_gradient_outputs
         ) const override;
+        
+        void initialize () override;
 
         /**
          * Declare the parameters this class takes through input files.
@@ -80,13 +82,31 @@ namespace aspect
             solid_density,
             fluid_density,
             average_density,
-            weighted_density
+            weighted_density,
+            side_boundary_magma_extraction
           };
         };
 
         typename DensityFormulation::Kind density_formulation;
 
         double fluid_density_weight;
+
+        // Side boundary magma extraction members
+        std::string                  extraction_boundary_name;
+        types::boundary_id           extraction_boundary_id;
+        double                       extraction_y_min;
+        double                       extraction_y_max;
+        double                       extraction_dx;
+        double                       side_pressure_gradient_weight;
+
+        // Mutable: recomputed lazily once per timestep inside fluid_pressure_gradient()
+        mutable std::vector<double>  lith_pressure;
+        mutable std::vector<double>  face_center_depths;
+        mutable unsigned int         last_update_timestep;
+
+        void recompute_lith_pressure_profile () const;
+        double interpolate_lith_pressure (const double depth) const;
+
     };
   }
 }
