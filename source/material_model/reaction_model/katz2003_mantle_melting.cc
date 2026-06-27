@@ -600,13 +600,13 @@ namespace aspect
                              "value k0*phi_c^3*(1-phi_c)^2, where phi_c is this porosity. A value "
                              "of -1 (default) uses the local porosity normally.");
             prm.declare_entry ("Channel porosity for compaction viscosity", "0.05",
-                             Patterns::Double(),
+                             Patterns::Double(1e-6),
                              "Compaction viscosity inside the melt extraction channel is held constant "
                              "at xi_0*phi_0/phi_c, where phi_c is this porosity (default=0.05) and phi_0=0.05. "
                              "The temperature dependence is based on Channel base temperature. ");
             prm.declare_entry ("Channel shear viscosity", "-1", 
                              Patterns::Double(),
-                             "Shear viscosity prescribed inside the no-freeze channel. "
+                             "Shear viscosity prescribed inside the magma extraction channel. "
                              "A value of -1 (default) leaves the viscosity unchanged. "
                              "Units: Pa s.");
         }
