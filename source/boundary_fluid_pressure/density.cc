@@ -22,6 +22,7 @@
 #include <aspect/boundary_fluid_pressure/density.h>
 #include <aspect/gravity_model/interface.h>
 #include <aspect/melt.h>
+#include <aspect/simulator_signals.h>
 #include <utility>
 #include <limits>
 #include <deal.II/fe/fe_values.h>
@@ -87,13 +88,6 @@ namespace aspect
 
               case DensityFormulation::side_boundary_magma_extraction:
               {
-                // Recompute profile once per timestep
-                if (this->get_timestep_number() != last_update_timestep)
-                  {
-                    recompute_lith_pressure_profile();
-                    last_update_timestep = this->get_timestep_number();
-                  }
-
                 const double y = material_model_inputs.position[q][dim-1];
                 if (boundary_indicator == extraction_boundary_id &&
                     y >= extraction_y_min && y <= extraction_y_max)
@@ -119,21 +113,29 @@ namespace aspect
         }
     }
 
+ 
     template <int dim>
     void
     Density<dim>::initialize ()
     {
       if (density_formulation == DensityFormulation::side_boundary_magma_extraction)
+      {
+        extraction_boundary_id =
+        this->get_geometry_model().translate_symbolic_boundary_name_to_id(extraction_boundary_name);
+
+      // Connect to the start_timestep signal so recompute_lith_pressure_profile()
+      // is called collectively on ALL MPI processes at the start of each timestep,
+      // before Stokes assembly. 
+        this->get_signals().start_timestep.connect([this](const SimulatorAccess<dim> &)
         {
-          extraction_boundary_id =
-            this->get_geometry_model().translate_symbolic_boundary_name_to_id(extraction_boundary_name);
-          last_update_timestep = numbers::invalid_unsigned_int;
-        }
+          this->recompute_lith_pressure_profile();
+        });
+      }
     }
 
     template <int dim>
     void
-    Density<dim>::recompute_lith_pressure_profile () const
+    Density<dim>::recompute_lith_pressure_profile ()
     {
       // Verify that the geometry is a Box (required to get x-coordinates of boundaries
       // and the y-coordinate of the top surface).

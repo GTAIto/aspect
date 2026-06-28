@@ -99,13 +99,13 @@ namespace aspect
         double                       extraction_dx;
         double                       side_pressure_gradient_weight;
 
-        // Mutable: recomputed lazily once per timestep inside fluid_pressure_gradient()
-        mutable std::vector<double>  lith_pressure;
-        mutable std::vector<double>  face_center_depths;
-        mutable unsigned int         last_update_timestep;
+        // Updated once per timestep via start_timestep signal (called on all MPI processes)
+        std::vector<double>  lith_pressure;
+        std::vector<double>  face_center_depths;
 
-        void recompute_lith_pressure_profile () const;
+        void recompute_lith_pressure_profile ();   // called from signal at start of each timestep (core.cc line 655) 
         double interpolate_lith_pressure (const double depth) const;
+
 
     };
   }
