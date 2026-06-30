@@ -339,9 +339,10 @@ namespace aspect
                 porosity = std::max(std::min(porosity,0.995),1e-4);
 
                  // In channel with specified porosity: constant compaction viscosity, no temperature dependence.
-                const double comp_visc_porosity = in_magma_extraction_channel 
-                                                  ? channel_porosity_for_compaction_viscosity 
-                                                  : porosity;
+                const double comp_visc_porosity = (in_magma_extraction_channel && channel_porosity_for_compaction_viscosity > 0)
+                                  ? channel_porosity_for_compaction_viscosity
+                                  : porosity;
+
                 melt_out->compaction_viscosities[i] = xi_0 * phi_0 / comp_visc_porosity;
 
                 double visc_temperature_dependence = 1.0;
@@ -596,11 +597,11 @@ namespace aspect
                              "value k0*phi_c^3*(1-phi_c)^2, where phi_c is this porosity. A value "
                              "of -1 (default) uses the local porosity normally.");
             prm.declare_entry ("Channel porosity for compaction viscosity", "-1.0",
-                             Patterns::Double(1e-6),
+                             Patterns::Double(),
                              "Compaction viscosity inside the melt extraction channel is held constant "
                              "at xi_0*phi_0/phi_c, where phi_c is this porosity (default=0.05) and phi_0=0.05. "
                              "A value of -1 (default) uses the local porosity normally.");
-            prm.declare_entry ("Channel shear viscosity", "-1", 
+            prm.declare_entry ("Channel shear viscosity", "-1.0", 
                              Patterns::Double(),
                              "Shear viscosity prescribed inside the magma extraction channel. "
                              "A value of -1 (default) leaves the viscosity unchanged. "
