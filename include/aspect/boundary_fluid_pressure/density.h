@@ -96,15 +96,15 @@ namespace aspect
         types::boundary_id           extraction_boundary_id;
         double                       extraction_y_min;
         double                       extraction_y_max;
-        double                       extraction_dx;
+        //double                       extraction_dx;
         double                       side_pressure_gradient_weight;
 
         // Updated once per timestep via start_timestep signal (called on all MPI processes)
-        std::vector<double>  lith_pressure;
-        std::vector<double>  face_center_depths;
+        //std::vector<double>  lith_pressure;
+        ///std::vector<double>  face_center_depths;
 
-        void recompute_lith_pressure_profile ();   // called from signal at start of each timestep (core.cc line 655) 
-        double interpolate_lith_pressure (const double depth) const;
+        //void recompute_lith_pressure_profile ();   // called from signal at start of each timestep (core.cc line 655) 
+        //double interpolate_lith_pressure (const double depth) const;
 
 
     };

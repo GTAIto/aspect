@@ -22,16 +22,15 @@
 #include <aspect/boundary_fluid_pressure/density.h>
 #include <aspect/gravity_model/interface.h>
 #include <aspect/melt.h>
-#include <aspect/simulator_signals.h>
+//#include <aspect/simulator_signals.h>
 #include <utility>
 #include <limits>
-#include <deal.II/fe/fe_values.h>
-#include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/mpi.h>
-#include <algorithm>
-#include <numeric>
-#include <aspect/geometry_model/box.h>
-
+//#include <deal.II/fe/fe_values.h>
+//#include <deal.II/base/quadrature_lib.h>
+//#include <deal.II/base/mpi.h>
+//#include <algorithm>
+//#include <numeric>
+//#include <aspect/geometry_model/box.h>
 
 namespace aspect
 {
@@ -92,11 +91,12 @@ namespace aspect
                 if (boundary_indicator == extraction_boundary_id &&
                     y >= extraction_y_min && y <= extraction_y_max)
                   {
-                    const double depth  = this->get_geometry_model().depth(material_model_inputs.position[q]);
-                    const double P_lith = interpolate_lith_pressure(depth);
-                    const double rho_l  = melt_outputs->fluid_densities[q];
+                    //const double depth  = this->get_geometry_model().depth(material_model_inputs.position[q]);
+                    //const double P_lith = interpolate_lith_pressure(depth);
+                    //const double rho_l  = melt_outputs->fluid_densities[q];
                     // (grad p_f)·n_outward should be negative for outward flux 
-                    fluid_pressure_gradient_outputs[q] =-side_pressure_gradient_weight* (P_lith - rho_l * gravity.norm() * depth) / extraction_dx;
+                    //fluid_pressure_gradient_outputs[q] =-side_pressure_gradient_weight* (P_lith - rho_l * gravity.norm() * depth) / extraction_dx;
+                    fluid_pressure_gradient_outputs[q] = -(1-side_pressure_gradient_weight)*(material_model_outputs.densities[q] - melt_outputs->fluid_densities[q])*gravity.norm();
                   }
                 else
                   {
@@ -126,14 +126,14 @@ namespace aspect
       // Connect to the start_timestep signal so recompute_lith_pressure_profile()
       // is called collectively on ALL MPI processes at the start of each timestep,
       // before Stokes assembly. 
-        this->get_signals().start_timestep.connect([this](const SimulatorAccess<dim> &)
-        {
-          this->recompute_lith_pressure_profile();
-        });
+      //  this->get_signals().start_timestep.connect([this](const SimulatorAccess<dim> &)
+      //   {
+      //    this->recompute_lith_pressure_profile();
+      //  });
       }
     }
 
-    template <int dim>
+    /*template <int dim>
     void
     Density<dim>::recompute_lith_pressure_profile ()
     {
@@ -314,11 +314,11 @@ namespace aspect
           lith_pressure[i] = sum + dz * 0.5 * out.densities[0] * g;
           sum             += dz * out.densities[0] * g;
         }
-    }
+    }*/
 
 
 
-    template <int dim>
+    /*template <int dim>
     double
     Density<dim>::interpolate_lith_pressure (const double depth) const
     {
@@ -337,7 +337,7 @@ namespace aspect
       const double d1   = face_center_depths[i];
       const double frac = (depth - d0) / (d1 - d0);
       return (1.0 - frac) * lith_pressure[i-1] + frac * lith_pressure[i];
-    }
+    }*/
 
 
     template <int dim>
@@ -380,9 +380,8 @@ namespace aspect
                              "parameter."
                              "\n\n"
                              "'side boundary magma extraction' prescribes (grad p_f)·n = "
-                             "W*(P_lith - rho_f*g*z)/dx on a user-defined portion of a side boundary, "
-                             "where P_lith is the current lithostatic pressure at the boundary, and "
-                             "W is the side pressure gradient weight.");
+                             "$(1-W)(rho\\_{s} - rho\\_{f}) g$ on the side boundary, where $rho\\_{s}$ is the solid density, "
+                             "$rho\\_{f}$ is the fluid density, g is the gravity, and W is a user-defined weight. ");
 
           prm.declare_entry ("Fluid density weight", "1.0",
                              Patterns::Double (0,1),
@@ -406,13 +405,15 @@ namespace aspect
             prm.declare_entry ("Extraction y max", "1e30",
                                Patterns::Double(),
                                "Maximum y-coordinate of the extraction zone. Units: m.");
-            prm.declare_entry ("Extraction horizontal distance scale", "1e3",
-                               Patterns::Double(0),
-                             "Horizontal distance dx in the formula (P_lith - rho_f*g*z)/dx. , should be ~half the grid size along the boundary Units: m.");
-             prm.declare_entry ("Side pressure gradient weight", "0.05",
+            //prm.declare_entry ("Extraction horizontal distance scale", "1e3",
+            //                   Patterns::Double(0),
+            //                 "Horizontal distance dx in the formula (P_lith - rho_f*g*z)/dx. , should be ~half the grid size along the boundary Units: m.");
+            prm.declare_entry ("Side pressure gradient weight", "0.99",
                                Patterns::Double(0,1),
-                               "Fluid pressure gradient on the side is this weight times the difference between"
-                               "the lithostatic and magma static pressure/dx");
+                               "The value $W$ used to weight the side boundary pressure gradient in the"   
+                               "equation $(1-W)(rho\\_{s} - rho\\_{f}) g$, which like the weighted density"
+                               "formulation, controls the excess fluid pressure gradient driving fluid flow"
+                               "out of the boundary");
           }
           prm.leave_subsection ();
         }
@@ -449,7 +450,7 @@ namespace aspect
                 extraction_boundary_name      = prm.get        ("Extraction boundary");
                 extraction_y_min              = prm.get_double ("Extraction y min");
                 extraction_y_max              = prm.get_double ("Extraction y max");
-                extraction_dx                 = prm.get_double ("Extraction horizontal distance scale");
+                //extraction_dx                 = prm.get_double ("Extraction horizontal distance scale");
                 side_pressure_gradient_weight = prm.get_double ("Side pressure gradient weight");
               }
               prm.leave_subsection ();
