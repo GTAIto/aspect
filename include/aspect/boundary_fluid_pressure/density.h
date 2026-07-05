@@ -18,13 +18,12 @@
   <http://www.gnu.org/licenses/>.
 */
 
-
 #ifndef _aspect_boundary_fluid_pressure_density_h
 #define _aspect_boundary_fluid_pressure_density_h
 
 #include <aspect/boundary_fluid_pressure/interface.h>
 #include <aspect/simulator_access.h>
-
+#include <deal.II/base/parsed_function.h>
 
 namespace aspect
 {
@@ -43,73 +42,59 @@ namespace aspect
     template <int dim>
     class Density : public Interface<dim>, public SimulatorAccess<dim>
     {
-      public:
-        /**
-         * @copydoc Interface::fluid_pressure_gradient
-         */
-        void fluid_pressure_gradient (
+    public:
+      /**
+       * @copydoc Interface::fluid_pressure_gradient
+       */
+      void fluid_pressure_gradient(
           const types::boundary_id boundary_indicator,
           const MaterialModel::MaterialModelInputs<dim> &material_model_inputs,
           const MaterialModel::MaterialModelOutputs<dim> &material_model_outputs,
-          const std::vector<Tensor<1,dim>> &normal_vectors,
-          std::vector<double> &fluid_pressure_gradient_outputs
-        ) const override;
-        
-        void initialize () override;
+          const std::vector<Tensor<1, dim>> &normal_vectors,
+          std::vector<double> &fluid_pressure_gradient_outputs) const override;
 
-        /**
-         * Declare the parameters this class takes through input files.
-         */
-        static
-        void
-        declare_parameters (ParameterHandler &prm);
+      void initialize() override;
 
-        /**
-         * Read the parameters this class declares from the parameter file.
-         */
-        void
-        parse_parameters (ParameterHandler &prm) override;
+      /**
+       * Declare the parameters this class takes through input files.
+       */
+      static void
+      declare_parameters(ParameterHandler &prm);
 
-      private:
-        /**
-         * Identify which density to use to compute the fluid pressure
-         * gradient at the model boundary.
-         */
-        struct DensityFormulation
+      /**
+       * Read the parameters this class declares from the parameter file.
+       */
+      void
+      parse_parameters(ParameterHandler &prm) override;
+
+    private:
+      /**
+       * Identify which density to use to compute the fluid pressure
+       * gradient at the model boundary.
+       */
+      struct DensityFormulation
+      {
+        enum Kind
         {
-          enum Kind
-          {
-            solid_density,
-            fluid_density,
-            average_density,
-            weighted_density,
-            side_boundary_magma_extraction
-          };
+          solid_density,
+          fluid_density,
+          average_density,
+          weighted_density,
+          side_boundary_magma_extraction
         };
+      };
 
-        typename DensityFormulation::Kind density_formulation;
+      typename DensityFormulation::Kind density_formulation;
 
-        double fluid_density_weight;
+      double fluid_density_weight;
 
-        // Side boundary magma extraction members
-        std::string                  extraction_boundary_name;
-        types::boundary_id           extraction_boundary_id;
-        double                       extraction_y_min;
-        double                       extraction_y_max;
-        //double                       extraction_dx;
-        double                       side_pressure_gradient_weight;
-
-        // Updated once per timestep via start_timestep signal (called on all MPI processes)
-        //std::vector<double>  lith_pressure;
-        ///std::vector<double>  face_center_depths;
-
-        //void recompute_lith_pressure_profile ();   // called from signal at start of each timestep (core.cc line 655) 
-        //double interpolate_lith_pressure (const double depth) const;
-
-
+      // Side boundary magma extraction members
+      std::string side_extraction_boundary_name;
+      types::boundary_id side_extraction_boundary_id;
+      double side_fluid_density_weight;
+      Functions::ParsedFunction<dim> side_extraction_indicator_function;
     };
   }
 }
-
 
 #endif
