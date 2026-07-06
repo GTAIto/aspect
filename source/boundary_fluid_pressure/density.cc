@@ -73,7 +73,11 @@ namespace aspect
 
         case DensityFormulation::side_boundary_magma_extraction:
         {
-          const double z = material_model_inputs.position[q][dim - 1];
+          if (this->convert_output_to_years())
+            side_extraction_indicator_function.set_time(this->get_time() / year_in_seconds);
+          else
+            side_extraction_indicator_function.set_time(this->get_time());
+
           if (boundary_indicator == side_extraction_boundary_id &&
               side_extraction_indicator_function.value(material_model_inputs.position[q]) > 0.5)
           {

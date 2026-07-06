@@ -52,89 +52,90 @@ namespace aspect
      */
     template <int dim>
     class MeltSimple : public MaterialModel::MeltInterface<dim>,
-      public MaterialModel::MeltFractionModel<dim>,
-      public ::aspect::SimulatorAccess<dim>
+                       public MaterialModel::MeltFractionModel<dim>,
+                       public ::aspect::SimulatorAccess<dim>
     {
-      public:
-        /**
-         * Return whether the model is compressible or not.  Incompressibility
-         * does not necessarily imply that the density is constant; rather, it
-         * may still depend on temperature or pressure. In the current
-         * context, compressibility means whether we should solve the continuity
-         * equation as $\nabla \cdot (\rho \mathbf u)=0$ (compressible Stokes)
-         * or as $\nabla \cdot \mathbf{u}=0$ (incompressible Stokes).
-         */
-        bool is_compressible () const override;
+    public:
+      /**
+       * Return whether the model is compressible or not.  Incompressibility
+       * does not necessarily imply that the density is constant; rather, it
+       * may still depend on temperature or pressure. In the current
+       * context, compressibility means whether we should solve the continuity
+       * equation as $\nabla \cdot (\rho \mathbf u)=0$ (compressible Stokes)
+       * or as $\nabla \cdot \mathbf{u}=0$ (incompressible Stokes).
+       */
+      bool is_compressible() const override;
 
-        /**
-         * Initialization function. This function is called once at the
-         * beginning of the program after parse_parameters is run and after
-         * the SimulatorAccess (if applicable) is initialized.
-         */
-        void
-        initialize () override;
+      /**
+       * Initialization function. This function is called once at the
+       * beginning of the program after parse_parameters is run and after
+       * the SimulatorAccess (if applicable) is initialized.
+       */
+      void
+      initialize() override;
 
-        void evaluate(const typename Interface<dim>::MaterialModelInputs &in,
-                      typename Interface<dim>::MaterialModelOutputs &out) const override;
+      /**
+       * This is called at the beginning of each time step.
+       */
+      void
+      update() override;
 
-        void melt_fractions (const MaterialModel::MaterialModelInputs<dim> &in,
-                             std::vector<double> &melt_fractions,
-                             const MaterialModel::MaterialModelOutputs<dim> *out = nullptr) const override;
+      void evaluate(const typename Interface<dim>::MaterialModelInputs &in,
+                    typename Interface<dim>::MaterialModelOutputs &out) const override;
 
-        /**
-         * @name Reference quantities
-         * @{
-         */
-        double reference_darcy_coefficient () const override;
+      void melt_fractions(const MaterialModel::MaterialModelInputs<dim> &in,
+                          std::vector<double> &melt_fractions,
+                          const MaterialModel::MaterialModelOutputs<dim> *out = nullptr) const override;
 
-        /**
-         * @}
-         */
+      /**
+       * @name Reference quantities
+       * @{
+       */
+      double reference_darcy_coefficient() const override;
 
-        /**
-         * @name Functions used in dealing with run-time parameters
-         * @{
-         */
-        /**
-         * Declare the parameters this class takes through input files.
-         */
-        static
-        void
-        declare_parameters (ParameterHandler &prm);
+      /**
+       * @}
+       */
 
-        /**
-         * Read the parameters this class declares from the parameter file.
-         */
-        void
-        parse_parameters (ParameterHandler &prm) override;
+      /**
+       * @name Functions used in dealing with run-time parameters
+       * @{
+       */
+      /**
+       * Declare the parameters this class takes through input files.
+       */
+      static void
+      declare_parameters(ParameterHandler &prm);
 
-        /**
-         * @}
-         */
+      /**
+       * Read the parameters this class declares from the parameter file.
+       */
+      void
+      parse_parameters(ParameterHandler &prm) override;
 
-        void
-        create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const override;
+      /**
+       * @}
+       */
 
+      void
+      create_additional_named_outputs(MaterialModel::MaterialModelOutputs<dim> &out) const override;
 
-      private:
-        bool model_is_compressible;
-        double thermal_expansivity;
-        double eta_0;
-        double reference_specific_heat;
-        double thermal_conductivity;
-        double compressibility;
-        double thermal_viscosity_exponent;
-        double reference_T;
-        double depletion_density_change;
-        double reference_rho_solid;
+    private:
+      bool model_is_compressible;
+      double thermal_expansivity;
+      double eta_0;
+      double reference_specific_heat;
+      double thermal_conductivity;
+      double compressibility;
+      double thermal_viscosity_exponent;
+      double reference_T;
+      double depletion_density_change;
+      double reference_rho_solid;
 
-
-
-        /*
-        * Object for computing the melt parameters
-        */
-        ReactionModel::Katz2003MantleMelting<dim> katz2003_model;
-
+      /*
+       * Object for computing the melt parameters
+       */
+      ReactionModel::Katz2003MantleMelting<dim> katz2003_model;
     };
 
   }

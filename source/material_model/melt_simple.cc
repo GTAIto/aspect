@@ -18,14 +18,12 @@
   <http://www.gnu.org/licenses/>.
 */
 
-
 #include <aspect/adiabatic_conditions/interface.h>
 #include <aspect/material_model/melt_simple.h>
 #include <aspect/material_model/reaction_model/katz2003_mantle_melting.h>
 #include <aspect/utilities.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/numerics/fe_field_function.h>
-
 
 namespace aspect
 {
@@ -34,7 +32,7 @@ namespace aspect
     template <int dim>
     double
     MeltSimple<dim>::
-    reference_darcy_coefficient () const
+        reference_darcy_coefficient() const
     {
       // 0.01 = 1% melt
       return katz2003_model.reference_darcy_coefficient();
@@ -43,7 +41,7 @@ namespace aspect
     template <int dim>
     bool
     MeltSimple<dim>::
-    is_compressible () const
+        is_compressible() const
     {
       return model_is_compressible;
     }
@@ -51,103 +49,100 @@ namespace aspect
     template <int dim>
     void
     MeltSimple<dim>::
-    melt_fractions (const MaterialModel::MaterialModelInputs<dim> &in,
-                    std::vector<double> &melt_fractions,
-                    const MaterialModel::MaterialModelOutputs<dim> *) const
+        melt_fractions(const MaterialModel::MaterialModelInputs<dim> &in,
+                       std::vector<double> &melt_fractions,
+                       const MaterialModel::MaterialModelOutputs<dim> *) const
     {
-      for (unsigned int q=0; q<in.n_evaluation_points(); ++q)
+      for (unsigned int q = 0; q < in.n_evaluation_points(); ++q)
         melt_fractions[q] = katz2003_model.melt_fraction(in.temperature[q],
                                                          this->get_adiabatic_conditions().pressure(in.position[q]));
     }
 
+    template <int dim>
+    void
+    MeltSimple<dim>::initialize()
+    {
+      if (this->include_melt_transport())
+      {
+        AssertThrow(this->get_parameters().use_operator_splitting,
+                    ExcMessage("The material model ``Melt simple'' can only be used with operator splitting!"));
+        AssertThrow(this->introspection().compositional_name_exists("peridotite"),
+                    ExcMessage("Material model Melt simple only works if there is a "
+                               "compositional field called peridotite."));
+        AssertThrow(this->introspection().compositional_name_exists("porosity"),
+                    ExcMessage("Material model Melt simple with melt transport only "
+                               "works if there is a compositional field called porosity."));
+      }
+    }
 
     template <int dim>
     void
-    MeltSimple<dim>::initialize ()
+    MeltSimple<dim>::update()
     {
-      if (this->include_melt_transport())
-        {
-          AssertThrow(this->get_parameters().use_operator_splitting,
-                      ExcMessage("The material model ``Melt simple'' can only be used with operator splitting!"));
-          AssertThrow(this->introspection().compositional_name_exists("peridotite"),
-                      ExcMessage("Material model Melt simple only works if there is a "
-                                 "compositional field called peridotite."));
-          AssertThrow(this->introspection().compositional_name_exists("porosity"),
-                      ExcMessage("Material model Melt simple with melt transport only "
-                                 "works if there is a compositional field called porosity."));
-        }
+      katz2003_model.update();
     }
-
 
     template <int dim>
     void
     MeltSimple<dim>::
-    evaluate(const typename Interface<dim>::MaterialModelInputs &in, typename Interface<dim>::MaterialModelOutputs &out) const
+        evaluate(const typename Interface<dim>::MaterialModelInputs &in, typename Interface<dim>::MaterialModelOutputs &out) const
     {
-      for (unsigned int i=0; i<in.n_evaluation_points(); ++i)
+      for (unsigned int i = 0; i < in.n_evaluation_points(); ++i)
+      {
+        // calculate density first, we need it for the reaction term
+        // first, calculate temperature dependence of density
+        double temperature_dependence = 1.0;
+        if (this->include_adiabatic_heating())
         {
-          // calculate density first, we need it for the reaction term
-          // first, calculate temperature dependence of density
-          double temperature_dependence = 1.0;
-          if (this->include_adiabatic_heating ())
-            {
-              // temperature dependence is 1 - alpha * (T - T(adiabatic))
-              temperature_dependence -= (in.temperature[i] - this->get_adiabatic_conditions().temperature(in.position[i]))
-                                        * thermal_expansivity;
-            }
-          else
-            temperature_dependence -= (in.temperature[i] - reference_T) * thermal_expansivity;
-
-          // calculate composition dependence of density
-          const double delta_rho = this->introspection().compositional_name_exists("peridotite")
-                                   ?
-                                   depletion_density_change * in.composition[i][this->introspection().compositional_index_for_name("peridotite")]
-                                   :
-                                   0.0;
-          out.densities[i] = (reference_rho_solid + delta_rho)
-                             * temperature_dependence * std::exp(compressibility * (in.pressure[i] - this->get_surface_pressure()));
-
-          out.viscosities[i] = eta_0;
-          out.thermal_expansion_coefficients[i] = thermal_expansivity;
-          out.specific_heat[i] = reference_specific_heat;
-          out.thermal_conductivities[i] = thermal_conductivity;
-          out.compressibilities[i] = compressibility;
-
-          double visc_temperature_dependence = 1.0;
-          if (this->include_adiabatic_heating ())
-            {
-              const double delta_temp = in.temperature[i]-this->get_adiabatic_conditions().temperature(in.position[i]);
-              visc_temperature_dependence = std::max(std::min(std::exp(-thermal_viscosity_exponent*delta_temp/this->get_adiabatic_conditions().temperature(in.position[i])),1e4),1e-4);
-            }
-          else
-            {
-              const double delta_temp = in.temperature[i]-reference_T;
-              const double T_dependence = (thermal_viscosity_exponent == 0.0
-                                           ?
-                                           0.0
-                                           :
-                                           thermal_viscosity_exponent*delta_temp/reference_T);
-              visc_temperature_dependence = std::max(std::min(std::exp(-T_dependence),1e4),1e-4);
-            }
-          out.viscosities[i] *= visc_temperature_dependence;
-
+          // temperature dependence is 1 - alpha * (T - T(adiabatic))
+          temperature_dependence -= (in.temperature[i] - this->get_adiabatic_conditions().temperature(in.position[i])) * thermal_expansivity;
         }
+        else
+          temperature_dependence -= (in.temperature[i] - reference_T) * thermal_expansivity;
+
+        // calculate composition dependence of density
+        const double delta_rho = this->introspection().compositional_name_exists("peridotite")
+                                     ? depletion_density_change * in.composition[i][this->introspection().compositional_index_for_name("peridotite")]
+                                     : 0.0;
+        out.densities[i] = (reference_rho_solid + delta_rho) * temperature_dependence * std::exp(compressibility * (in.pressure[i] - this->get_surface_pressure()));
+
+        out.viscosities[i] = eta_0;
+        out.thermal_expansion_coefficients[i] = thermal_expansivity;
+        out.specific_heat[i] = reference_specific_heat;
+        out.thermal_conductivities[i] = thermal_conductivity;
+        out.compressibilities[i] = compressibility;
+
+        double visc_temperature_dependence = 1.0;
+        if (this->include_adiabatic_heating())
+        {
+          const double delta_temp = in.temperature[i] - this->get_adiabatic_conditions().temperature(in.position[i]);
+          visc_temperature_dependence = std::max(std::min(std::exp(-thermal_viscosity_exponent * delta_temp / this->get_adiabatic_conditions().temperature(in.position[i])), 1e4), 1e-4);
+        }
+        else
+        {
+          const double delta_temp = in.temperature[i] - reference_T;
+          const double T_dependence = (thermal_viscosity_exponent == 0.0
+                                           ? 0.0
+                                           : thermal_viscosity_exponent * delta_temp / reference_T);
+          visc_temperature_dependence = std::max(std::min(std::exp(-T_dependence), 1e4), 1e-4);
+        }
+        out.viscosities[i] *= visc_temperature_dependence;
+      }
 
       // Set the reaction terms to zero.
       // Melting and freezing reactions are set with the reaction rates,
       // which are filled by the Katz 2003 reaction model.
-      for (unsigned int q=0; q<out.n_evaluation_points(); ++q)
-        for (unsigned int c=0; c<in.composition[q].size(); ++c)
+      for (unsigned int q = 0; q < out.n_evaluation_points(); ++q)
+        for (unsigned int c = 0; c < in.composition[q].size(); ++c)
           out.reaction_terms[q][c] = 0.0;
 
       katz2003_model.calculate_reaction_rate_outputs(in, out);
       katz2003_model.calculate_fluid_outputs(in, out, reference_T);
     }
 
-
     template <int dim>
     void
-    MeltSimple<dim>::declare_parameters (ParameterHandler &prm)
+    MeltSimple<dim>::declare_parameters(ParameterHandler &prm)
     {
       prm.enter_subsection("Material model");
       {
@@ -156,109 +151,102 @@ namespace aspect
           // Melt Fraction Parameters
           ReactionModel::Katz2003MantleMelting<dim>::declare_parameters(prm);
 
-
-          prm.declare_entry ("Use full compressibility", "false",
-                             Patterns::Bool (),
-                             "If the compressibility should be used everywhere in the code "
-                             "(if true), changing the volume of material when the density changes, "
-                             "or only in the momentum conservation and advection equations "
-                             "(if false).");
-          prm.declare_entry ("Thermal expansion coefficient", "2e-5",
-                             Patterns::Double (0.),
-                             "The value of the thermal expansion coefficient $\\beta$. "
-                             "Units: $\\frac{1}{\\text{K}}$.");
-          prm.declare_entry ("Reference shear viscosity", "5e20",
-                             Patterns::Double (0.),
-                             "The value of the constant viscosity $\\eta_0$ of the solid matrix. "
-                             "This viscosity may be modified by both temperature and porosity "
-                             "dependencies. Units: $\\text{Pa}\\text{s}$.");
-          prm.declare_entry ("Reference specific heat", "1250.",
-                             Patterns::Double (0.),
-                             "The value of the specific heat $C_p$. "
-                             "Units: $\\frac{\\text{J}}{\\text{K}\\text{kg}}$.");
-          prm.declare_entry ("Thermal conductivity", "4.7",
-                             Patterns::Double (0.),
-                             "The value of the thermal conductivity $k$. "
-                             "Units: $\\frac{\\text{W}}{\\text{m}\\text{K}}$.");
-          prm.declare_entry ("Solid compressibility", "0.0",
-                             Patterns::Double (0.),
-                             "The value of the compressibility of the solid matrix. "
-                             "Units: $\\frac{1}{\\text{Pa}}$.");
-          prm.declare_entry ("Thermal viscosity exponent", "0.0",
-                             Patterns::Double (0.),
-                             "The temperature dependence of the shear viscosity. Dimensionless exponent. "
-                             "See the general documentation "
-                             "of this model for a formula that states the dependence of the "
-                             "viscosity on this factor, which is called $\\beta$ there.");
-          prm.declare_entry ("Reference temperature", "293.",
-                             Patterns::Double (0.),
-                             "The reference temperature $T_0$. The reference temperature is used "
-                             "in both the density and viscosity formulas. Units: $\\text{K}$.");
-          prm.declare_entry ("Depletion density change", "0.0",
-                             Patterns::Double (),
-                             "The density contrast between material with a depletion of 1 and a "
-                             "depletion of zero. Negative values indicate lower densities of "
-                             "depleted material. Depletion is indicated by the compositional "
-                             "field with the name peridotite. Not used if this field does not "
-                             "exist in the model. "
-                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
-          prm.declare_entry ("Reference solid density", "3000.",
-                             Patterns::Double (0.),
-                             "Reference density of the solid $\\rho_{s,0}$. "
-                             "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
+          prm.declare_entry("Use full compressibility", "false",
+                            Patterns::Bool(),
+                            "If the compressibility should be used everywhere in the code "
+                            "(if true), changing the volume of material when the density changes, "
+                            "or only in the momentum conservation and advection equations "
+                            "(if false).");
+          prm.declare_entry("Thermal expansion coefficient", "2e-5",
+                            Patterns::Double(0.),
+                            "The value of the thermal expansion coefficient $\\beta$. "
+                            "Units: $\\frac{1}{\\text{K}}$.");
+          prm.declare_entry("Reference shear viscosity", "5e20",
+                            Patterns::Double(0.),
+                            "The value of the constant viscosity $\\eta_0$ of the solid matrix. "
+                            "This viscosity may be modified by both temperature and porosity "
+                            "dependencies. Units: $\\text{Pa}\\text{s}$.");
+          prm.declare_entry("Reference specific heat", "1250.",
+                            Patterns::Double(0.),
+                            "The value of the specific heat $C_p$. "
+                            "Units: $\\frac{\\text{J}}{\\text{K}\\text{kg}}$.");
+          prm.declare_entry("Thermal conductivity", "4.7",
+                            Patterns::Double(0.),
+                            "The value of the thermal conductivity $k$. "
+                            "Units: $\\frac{\\text{W}}{\\text{m}\\text{K}}$.");
+          prm.declare_entry("Solid compressibility", "0.0",
+                            Patterns::Double(0.),
+                            "The value of the compressibility of the solid matrix. "
+                            "Units: $\\frac{1}{\\text{Pa}}$.");
+          prm.declare_entry("Thermal viscosity exponent", "0.0",
+                            Patterns::Double(0.),
+                            "The temperature dependence of the shear viscosity. Dimensionless exponent. "
+                            "See the general documentation "
+                            "of this model for a formula that states the dependence of the "
+                            "viscosity on this factor, which is called $\\beta$ there.");
+          prm.declare_entry("Reference temperature", "293.",
+                            Patterns::Double(0.),
+                            "The reference temperature $T_0$. The reference temperature is used "
+                            "in both the density and viscosity formulas. Units: $\\text{K}$.");
+          prm.declare_entry("Depletion density change", "0.0",
+                            Patterns::Double(),
+                            "The density contrast between material with a depletion of 1 and a "
+                            "depletion of zero. Negative values indicate lower densities of "
+                            "depleted material. Depletion is indicated by the compositional "
+                            "field with the name peridotite. Not used if this field does not "
+                            "exist in the model. "
+                            "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
+          prm.declare_entry("Reference solid density", "3000.",
+                            Patterns::Double(0.),
+                            "Reference density of the solid $\\rho_{s,0}$. "
+                            "Units: $\\frac{\\text{kg}}{\\text{m}^3}$.");
         }
         prm.leave_subsection();
       }
       prm.leave_subsection();
     }
 
-
-
     template <int dim>
     void
-    MeltSimple<dim>::parse_parameters (ParameterHandler &prm)
+    MeltSimple<dim>::parse_parameters(ParameterHandler &prm)
     {
       prm.enter_subsection("Material model");
       {
         prm.enter_subsection("Melt simple");
         {
-          model_is_compressible      = prm.get_bool ("Use full compressibility");
-          reference_specific_heat    = prm.get_double ("Reference specific heat");
-          eta_0                      = prm.get_double ("Reference shear viscosity");
-          thermal_expansivity        = prm.get_double ("Thermal expansion coefficient");
-          thermal_conductivity       = prm.get_double ("Thermal conductivity");
-          compressibility            = prm.get_double ("Solid compressibility");
-          thermal_viscosity_exponent = prm.get_double ("Thermal viscosity exponent");
-          reference_T                = prm.get_double ("Reference temperature");
-          depletion_density_change   = prm.get_double ("Depletion density change");
-          reference_rho_solid        = prm.get_double ("Reference solid density");
+          model_is_compressible = prm.get_bool("Use full compressibility");
+          reference_specific_heat = prm.get_double("Reference specific heat");
+          eta_0 = prm.get_double("Reference shear viscosity");
+          thermal_expansivity = prm.get_double("Thermal expansion coefficient");
+          thermal_conductivity = prm.get_double("Thermal conductivity");
+          compressibility = prm.get_double("Solid compressibility");
+          thermal_viscosity_exponent = prm.get_double("Thermal viscosity exponent");
+          reference_T = prm.get_double("Reference temperature");
+          depletion_density_change = prm.get_double("Depletion density change");
+          reference_rho_solid = prm.get_double("Reference solid density");
 
-
-
-          if (thermal_viscosity_exponent!=0.0 && reference_T == 0.0)
+          if (thermal_viscosity_exponent != 0.0 && reference_T == 0.0)
             AssertThrow(false, ExcMessage("Error: Material model Melt simple with Thermal viscosity exponent can not have reference_T=0."));
 
           // Melt model
-          katz2003_model.initialize_simulator (this->get_simulator());
+          katz2003_model.initialize_simulator(this->get_simulator());
           katz2003_model.parse_parameters(prm);
-
         }
         prm.leave_subsection();
       }
       prm.leave_subsection();
     }
 
-
     template <int dim>
     void
-    MeltSimple<dim>::create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const
+    MeltSimple<dim>::create_additional_named_outputs(MaterialModel::MaterialModelOutputs<dim> &out) const
     {
       if (this->get_parameters().use_operator_splitting && out.template has_additional_output_object<ReactionRateOutputs<dim>>() == false)
-        {
-          const unsigned int n_points = out.n_evaluation_points();
-          out.additional_outputs.push_back(
-            std::make_unique<MaterialModel::ReactionRateOutputs<dim>> (n_points, this->n_compositional_fields()));
-        }
+      {
+        const unsigned int n_points = out.n_evaluation_points();
+        out.additional_outputs.push_back(
+            std::make_unique<MaterialModel::ReactionRateOutputs<dim>>(n_points, this->n_compositional_fields()));
+      }
     }
   }
 }

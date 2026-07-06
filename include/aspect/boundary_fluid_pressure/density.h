@@ -92,7 +92,7 @@ namespace aspect
       std::string side_extraction_boundary_name;
       types::boundary_id side_extraction_boundary_id;
       double side_fluid_density_weight;
-      Functions::ParsedFunction<dim> side_extraction_indicator_function;
+      mutable Functions::ParsedFunction<dim> side_extraction_indicator_function;
     };
   }
 }
