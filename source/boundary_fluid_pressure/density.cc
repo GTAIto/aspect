@@ -153,10 +153,9 @@ namespace aspect
 
           prm.declare_entry("Fluid density weight", "1.0",
                             Patterns::Double(0, 1),
-                            "The value $w$ used to weight the fluid and solid densities in the "
+                            "The value (w) used to weight the fluid and solid densities in the "
                             "`weighted density' boundary condition. The boundary fluid pressure is "
-                            "computed as $w rho\\_{f} + (1-w) rho\\_{s} g$, where $rho\\_{f}$ is the "
-                            "fluid density, $rho\\_{s}$ is the solid density and $g$ is the gravity. "
+                            "computed as (w*fluid_density + (1-w)*solid_density)*gravity."
                             "That means that if $w=1$, this formulation is equivalent to the "
                             "`fluid density' formulation, and if $w=0$, this formulation is equivalent "
                             "to the `solid density' formulation. "
@@ -175,10 +174,14 @@ namespace aspect
 
             prm.declare_entry("Side fluid density weight", "0.99",
                               Patterns::Double(0, 1),
-                              "The value $W$ used to weight the side boundary fluid density in the"
-                              "equation $(1-W)(rho\\_{s} - rho\\_{f}) g$, which like the weighted density"
+                              "The value (W) used to weight the side boundary fluid density in the"
+                              "equation (1-W)(rho - rhof)*g, which like the weighted density"
                               "formulation, controls the excess fluid pressure gradient driving fluid flow"
                               "out of the boundary");
+            prm.declare_entry("Side extraction maximum temperature", "1573",
+                              Patterns::Double(0, 1),
+                              "The side magma extraction only occurs were temperature is"
+                              "less than this value");
           }
           prm.leave_subsection();
         }
@@ -228,6 +231,7 @@ namespace aspect
               prm.leave_subsection();
               // extraction_dx                 = prm.get_double ("Extraction horizontal distance scale");
               side_fluid_density_weight = prm.get_double("Side fluid density weight");
+              side_extraction_max_T   = prm.get_double("Side extraction maximum temperature")
             }
             prm.leave_subsection();
           }
