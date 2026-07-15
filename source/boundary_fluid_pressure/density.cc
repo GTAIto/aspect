@@ -79,7 +79,9 @@ namespace aspect
             side_extraction_indicator_function.set_time(this->get_time());
 
           if (boundary_indicator == side_extraction_boundary_id &&
-              side_extraction_indicator_function.value(material_model_inputs.position[q]) > 0.5)
+              side_extraction_indicator_function.value(material_model_inputs.position[q]) > 0.5 &&
+              material_model_inputs.temperature[q] < side_extraction_max_T)
+
           {
             fluid_pressure_gradient_outputs[q] = -(1 - side_fluid_density_weight) * (material_model_outputs.densities[q] - melt_outputs->fluid_densities[q]) * gravity.norm();
           }
@@ -179,7 +181,7 @@ namespace aspect
                               "formulation, controls the excess fluid pressure gradient driving fluid flow"
                               "out of the boundary");
             prm.declare_entry("Side extraction maximum temperature", "1573",
-                              Patterns::Double(0, 1),
+                              Patterns::Double(0),
                               "The side magma extraction only occurs were temperature is"
                               "less than this value");
           }
@@ -229,9 +231,8 @@ namespace aspect
                 }
               }
               prm.leave_subsection();
-              // extraction_dx                 = prm.get_double ("Extraction horizontal distance scale");
               side_fluid_density_weight = prm.get_double("Side fluid density weight");
-              side_extraction_max_T   = prm.get_double("Side extraction maximum temperature")
+              side_extraction_max_T   = prm.get_double("Side extraction maximum temperature");
             }
             prm.leave_subsection();
           }
