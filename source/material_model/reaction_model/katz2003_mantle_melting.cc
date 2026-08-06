@@ -269,8 +269,7 @@ namespace aspect
             const double perm_porosity = (in_magma_extraction_channel && channel_porosity_for_permeability > 0)
                                              ? channel_porosity_for_permeability
                                              : porosity;
-            melt_out->permeabilities[i] = reference_permeability * Utilities::fixed_power<3>(perm_porosity) * Utilities::fixed_power<2>(1.0 - perm_porosity);
-
+            melt_out->permeabilities[i] = reference_permeability * std::pow(perm_porosity, permeability_porosity_exponent_n) * std::pow(1.0 - perm_porosity, permeability_porosity_exponent_m);
             // first, calculate temperature dependence of density
             double temperature_dependence = 1.0;
             if (this->include_adiabatic_heating())
@@ -524,9 +523,17 @@ namespace aspect
                           "is used. "
                           "Units: $\\text{K}$.");
         prm.declare_entry("Reference permeability", "1e-8",
-                          Patterns::Double(),
+                          Patterns::Double(0),
                           "Reference permeability of the solid host rock."
                           "Units: \\si{\\meter\\squared}.");
+        prm.declare_entry("Permeability porosity exponent n", "3",
+                         Patterns::Double(),
+                         "Exponent on porosity in the permeability function ,k=k0*phi^n*(1-phi)^m. "
+                         "Units: none.");
+        prm.declare_entry("Permeability porosity exponent m", "2",
+                         Patterns::Double(0),
+                         "Exponent on (1-porosity) in the permeability function ,k=k0*phi^n*(1-phi)^m. "
+                         "Units: none.");
 
         prm.enter_subsection("Magma extraction channel indicator function");
         {
@@ -589,6 +596,9 @@ namespace aspect
         melt_bulk_modulus_derivative = prm.get_double("Melt bulk modulus derivative");
         depletion_solidus_change = prm.get_double("Depletion solidus change");
         reference_permeability = prm.get_double("Reference permeability");
+        permeability_porosity_exponent_n = prm.get_double("Permeability porosity exponent n");
+        permeability_porosity_exponent_m = prm.get_double("Permeability porosity exponent m");
+
 
         prm.enter_subsection("Magma extraction channel indicator function");
         {

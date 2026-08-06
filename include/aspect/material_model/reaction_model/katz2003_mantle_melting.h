@@ -131,6 +131,10 @@ namespace aspect
         double freezing_rate;
         double melting_time_scale;
         double reference_permeability;
+        double permeability_porosity_exponent_n;
+        double permeability_porosity_exponent_m;
+
+
         Functions::ParsedFunction<dim> magma_extraction_channel_indicator_function;
         double channel_base_temperature;
         double channel_porosity_for_permeability;
