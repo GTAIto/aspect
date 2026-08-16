@@ -136,7 +136,7 @@ namespace aspect
         for (unsigned int c = 0; c < in.composition[q].size(); ++c)
           out.reaction_terms[q][c] = 0.0;
 
-      katz2003_model.calculate_reaction_rate_outputs(in, out);
+      katz2003_model.calculate_reaction_rate_outputs(in, out, reference_rho_solid);
       katz2003_model.calculate_fluid_outputs(in, out, reference_T);
     }
 
