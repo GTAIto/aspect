@@ -163,23 +163,19 @@ namespace aspect
             else
             {
               // incremental batch melting
-              // The mass of the solid is (1-old_porosity)*(solid density). The mass of solid transferred to melt is 
-              // (equilibrium_depletion-current_depletion)*(1-old_porosity)*(solid density). But the output of this routine is mass
+              // The mass of solid transferred to melt is (equilibrium_depletion-current_depletion)*(solid density). But the output of this routine is mass
               // fraction and thus there is no mulitiplication by solid density. It is positive for melting and negative for freezing.
               // The freezing amount, however, is limited by the mass of melt present, old_porosity*(fluid density); therefore
               // the mass fraction transferred is >= -old_porosity(fluid density)/(solid density).
-              //
-              // Variable names have been retained from prior versions of this routine:
-              // "porosity_change"= the mass fraction of solid transfered to melt.
-              // "maximum_melt_fraction" = the depletion of the cell from the previous timestep
+              // Variable definitions:
+              // "porosity_change"= the mass fraction of solid transfered to melt for the RHS of the porosity evolution equation.
+              // "maximum_melt_fracvtion" = the depletion of the cell from the previous timestep
               // "eq_melt_fraction" = equilibrium depletion based on the cell's current temperature and pressure
               // "old_porosity" = porosity (i.e., volume fraction melt) of the cell from the previous timestep
 
               const double eq_melt_fraction = melt_fraction(in.temperature[i], this->get_adiabatic_conditions().pressure(in.position[i]));
-              double change_in_depletion = eq_melt_fraction - maximum_melt_fraction;
               double mass_of_melt = old_porosity*reference_rho_fluid;
-              
-              porosity_change = change_in_depletion*(1-old_porosity);
+              porosity_change =  (eq_melt_fraction - maximum_melt_fraction);
 
               //We also assume that if the equilibrium depletion = 0, then all the melt freezes
               if (eq_melt_fraction<=0.0 && porosity_change <0)
@@ -191,19 +187,27 @@ namespace aspect
               
               porosity_change = std::max(porosity_change,-mass_of_melt/solid_density); 
 
+              //Dont allow peridotite to be negative
+              double depletion_change =  std::max(porosity_change,(eq_melt_fraction - maximum_melt_fraction)); 
+
               // optional magma extraction channel
               const bool in_magma_extraction_channel = (magma_extraction_channel_indicator_function.value(in.position[i]) > 0.5) && in.temperature[i] <= channel_base_temperature;
 
-              // Adapt time scale of freezing with respect to melting.
-              // We have to multiply with the melting time scale here to obtain the mass fraction change
+              // For freezing, we have to multiply with the melting time scale to obtain the mass fraction change
               // that happens in the time defined by the melting time scale (as opposed to a rate).
-              // Later on, the overall porosity change is then divided again by the melting time scale
-              // to obtain the rate of melting or freezing, which is used in the operator splitting scheme.
+              // This is later divided by the melting time scale to obtain the rate of melting or freezing, 
+              // which is used in the operator splitting scheme.
 
               if (in_magma_extraction_channel && porosity_change < 0)
+              {
                 porosity_change = 0.0;
+                depletion_change = 0.0;
+              }
               else if (porosity_change < 0)
+              {
                 porosity_change *= freezing_rate * melting_time_scale;
+                depletion_change *= freezing_rate * melting_time_scale;
+              }
             }
 
             // because depletion is a volume-based, and not a mass-based property that is advected,
@@ -214,10 +218,8 @@ namespace aspect
               if (reaction_rate_out != nullptr && in.requests_property(MaterialProperties::reaction_rates))
               {
                 if (c == peridotite_idx && this->get_timestep_number() > 0)
-                // for peridotite we pass the change in depletion
-                  reaction_rate_out->reaction_rates[i][c] = porosity_change / melting_time_scale/(1 - old_porosity);
+                  reaction_rate_out->reaction_rates[i][c] = depletion_change / melting_time_scale;
                 else if (c == porosity_idx && this->get_timestep_number() > 0)
-                // for porosity we pass the mass fraction solid to melt. 
                   reaction_rate_out->reaction_rates[i][c] = porosity_change / melting_time_scale;
                 else
                   reaction_rate_out->reaction_rates[i][c] = 0.0;
