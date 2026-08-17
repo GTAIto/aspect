@@ -97,7 +97,9 @@ namespace aspect
          * out.entropy_derivative_pressure and entropy_derivative_temperature
          */
         void calculate_reaction_rate_outputs(const typename Interface<dim>::MaterialModelInputs &in,
-                                             typename Interface<dim>::MaterialModelOutputs &out) const;
+                                     typename Interface<dim>::MaterialModelOutputs &out) const;
+
+
 
         /**
          * Compute all the fluid variables needed for a reactive transport model based on the
