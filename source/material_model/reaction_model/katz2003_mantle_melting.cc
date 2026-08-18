@@ -144,37 +144,44 @@ namespace aspect
           const double maximum_melt_fraction = this->include_melt_transport()
                                                    ? in.composition[i][this->introspection().compositional_index_for_name("peridotite")]
                                                    : 0.0;
+
           if (this->include_melt_transport() && in.requests_property(MaterialProperties::reaction_rates))
           {
             const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
             const unsigned int peridotite_idx = this->introspection().compositional_index_for_name("peridotite");
             const double old_porosity = in.composition[i][porosity_idx];
-            const double solid_density = (out.densities[i]-reference_rho_fluid*old_porosity)/(1-old_porosity);
-            // calculate the melting rate as difference between the equilibrium melt fraction
-            // and the solution of the previous time step
+            const double solid_density = out.densities[i];
+            const double mass_of_melt = old_porosity*reference_rho_fluid;
             double porosity_change = 0.0;
+            double depletion_change = 0.0;
+
             if (fractional_melting)
             {
               // solidus is lowered by previous melting events (fractional melting)
-              const double solidus_change = (maximum_melt_fraction - old_porosity) * depletion_solidus_change;
+              AssertThrow(false, ExcMessage("Fractional melting may not work. For example, "
+                                "it is not scaled by melting_times_scale or freezing_rate"));
+              const double solidus_change = (maximum_melt_fraction - mass_of_melt/solid_density) * depletion_solidus_change;
               const double eq_melt_fraction = melt_fraction(in.temperature[i] - solidus_change, this->get_adiabatic_conditions().pressure(in.position[i]));
-              porosity_change = eq_melt_fraction - old_porosity;
+              porosity_change = eq_melt_fraction - mass_of_melt/solid_density;
+              depletion_change = std::max(porosity_change, (eq_melt_fraction-maximum_melt_fraction));
             }
             else
             {
               // incremental batch melting
-              // The mass of solid transferred to melt is (equilibrium_depletion-current_depletion)*(solid density). But the output of this routine is mass
-              // fraction and thus there is no mulitiplication by solid density. It is positive for melting and negative for freezing.
-              // The freezing amount, however, is limited by the mass of melt present, old_porosity*(fluid density); therefore
-              // the mass fraction transferred is >= -old_porosity(fluid density)/(solid density).
+              // The mass of solid transferred to melt is (equilibrium_depletion-current_depletion)*(solid density). But the output of is 
+              // this routine is mass fraction, thus there is no mulitiplication by solid density. It is positive for melting and 
+              // negative for freezing. The freezing amount, however, is limited by the mass of melt present, old_porosity*(fluid density);
+              // therefore the mass fraction transferred is >= -old_porosity*(fluid density)/(solid density).
               // Variable definitions:
               // "porosity_change"= the mass fraction of solid transfered to melt for the RHS of the porosity evolution equation.
-              // "maximum_melt_fracvtion" = the depletion of the cell from the previous timestep
+              // "maximum_melt_fraction" = the depletion of the cell from the previous timestep
               // "eq_melt_fraction" = equilibrium depletion based on the cell's current temperature and pressure
               // "old_porosity" = porosity (i.e., volume fraction melt) of the cell from the previous timestep
+              // "depletion_change" = same as porosity_change, but limited to be not more negative than (eq_melt_fraction - maximum_melt_fraction) 
+              //                      to keepperidotite >=0 
 
               const double eq_melt_fraction = melt_fraction(in.temperature[i], this->get_adiabatic_conditions().pressure(in.position[i]));
-              double mass_of_melt = old_porosity*reference_rho_fluid;
+              
               porosity_change =  (eq_melt_fraction - maximum_melt_fraction);
 
               //We also assume that if the equilibrium depletion = 0, then all the melt freezes
@@ -188,7 +195,7 @@ namespace aspect
               porosity_change = std::max(porosity_change,-mass_of_melt/solid_density); 
 
               //Dont allow peridotite to be negative
-              double depletion_change =  std::max(porosity_change,(eq_melt_fraction - maximum_melt_fraction)); 
+              depletion_change =  std::max(porosity_change,(eq_melt_fraction - maximum_melt_fraction)); 
 
               // optional magma extraction channel
               const bool in_magma_extraction_channel = (magma_extraction_channel_indicator_function.value(in.position[i]) > 0.5) && in.temperature[i] <= channel_base_temperature;
