@@ -184,14 +184,15 @@ namespace aspect
               
               porosity_change =  (eq_melt_fraction - maximum_melt_fraction);
 
-              //We also assume that if the equilibrium depletion = 0, then all the melt freezes
-              if (eq_melt_fraction<=0.0 && porosity_change <0)
+              //We also assume that if the equilibrium depletion = 0, then if there is melt, it should freeze. 
+              if (eq_melt_fraction<=0.0)
                 porosity_change=-mass_of_melt/solid_density;
               // remove melt that gets near the extraction_depth
               else if (this->get_geometry_model().depth(in.position[i]) < extraction_depth)
                 porosity_change =-mass_of_melt/solid_density * \
                                  (in.position[i](1) - (this->get_geometry_model().maximal_depth() - extraction_depth)) / extraction_depth;
-              
+                                 
+              //If there is freezing, then it can't exceed the amount of melt present
               porosity_change = std::max(porosity_change,-mass_of_melt/solid_density); 
 
               //Dont allow peridotite to be negative
