@@ -150,7 +150,8 @@ namespace aspect
             const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
             const unsigned int peridotite_idx = this->introspection().compositional_index_for_name("peridotite");
             const double old_porosity = in.composition[i][porosity_idx];
-            const double solid_density = out.densities[i];
+            //const double solid_density = out.densities[i];
+            const double solid_density = 2500.0; 
             const double mass_of_melt = old_porosity*reference_rho_fluid;
             double porosity_change = 0.0;
             double depletion_change = 0.0;
@@ -158,8 +159,6 @@ namespace aspect
             if (fractional_melting)
             {
               // solidus is lowered by previous melting events (fractional melting)
-              AssertThrow(false, ExcMessage("Fractional melting may not work. For example, "
-                                "it is not scaled by melting_times_scale or freezing_rate"));
               const double solidus_change = (maximum_melt_fraction - mass_of_melt/solid_density) * depletion_solidus_change;
               const double eq_melt_fraction = melt_fraction(in.temperature[i] - solidus_change, this->get_adiabatic_conditions().pressure(in.position[i]));
               porosity_change = eq_melt_fraction - mass_of_melt/solid_density;
@@ -594,6 +593,8 @@ namespace aspect
         extraction_depth = prm.get_double("Melt extraction depth");
         melt_compressibility = prm.get_double("Melt compressibility");
         fractional_melting = prm.get_bool("Use fractional melting");
+        AssertThrow(!fractional_melting,
+              ExcMessage("Fractional melting is not supported."));
         freezing_rate = prm.get_double("Freezing rate");
         melting_time_scale = prm.get_double("Melting time scale for operator splitting");
         melt_bulk_modulus_derivative = prm.get_double("Melt bulk modulus derivative");
@@ -647,6 +648,7 @@ namespace aspect
                                                                                                                                "'Freezing rate' chosen in the material model, which is currently " +
                                  Utilities::to_string(1.0 / freezing_rate) + "."));
         }
+
       }
 
       template <int dim>
