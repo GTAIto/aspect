@@ -150,8 +150,7 @@ namespace aspect
             const unsigned int porosity_idx = this->introspection().compositional_index_for_name("porosity");
             const unsigned int peridotite_idx = this->introspection().compositional_index_for_name("peridotite");
             const double old_porosity = in.composition[i][porosity_idx];
-            //const double solid_density = out.densities[i];
-            const double solid_density = 2500.0; 
+            const double solid_density = out.densities[i];
             const double mass_of_melt = old_porosity*reference_rho_fluid;
             double porosity_change = 0.0;
             double depletion_change = 0.0;
