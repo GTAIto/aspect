@@ -180,16 +180,26 @@ namespace aspect
 
               const double eq_melt_fraction = melt_fraction(in.temperature[i], this->get_adiabatic_conditions().pressure(in.position[i]));
               
-              porosity_change =  (eq_melt_fraction - maximum_melt_fraction);
 
-              //We also assume that if the equilibrium depletion = 0, then if there is melt, it should freeze. 
-              if (eq_melt_fraction<=0.0)
+
+              //We assume that if the equilibrium depletion = 0, then if there is melt, it should freeze. 
+              //But to mitigate potential discontinuity in porosity_change at eq_melt_fraction=0, we taper between the
+              //positive and negative change over the melt_freeze_smoothing_width
+              if (eq_melt_fraction<= -melt_freeze_smoothing_width)
                 porosity_change=-mass_of_melt/solid_density;
+              else if (eq_melt_fraction < melt_freeze_smoothing_width)
+               {
+                  const double near_solidus_smoothing = (eq_melt_fraction + melt_freeze_smoothing_width) / (2.0 *  melt_freeze_smoothing_width);
+                  porosity_change = (1.0 - near_solidus_smoothing) * (-mass_of_melt/solid_density)
+                                  + near_solidus_smoothing * (eq_melt_fraction - maximum_melt_fraction);
+               }
               // remove melt that gets near the extraction_depth
               else if (this->get_geometry_model().depth(in.position[i]) < extraction_depth)
                 porosity_change =-mass_of_melt/solid_density * \
                                  (in.position[i](1) - (this->get_geometry_model().maximal_depth() - extraction_depth)) / extraction_depth;
-                                 
+              else
+                porosity_change =  (eq_melt_fraction - maximum_melt_fraction);   
+
               //If there is freezing, then it can't exceed the amount of melt present
               porosity_change = std::max(porosity_change,-mass_of_melt/solid_density); 
 
@@ -213,6 +223,13 @@ namespace aspect
               {
                 porosity_change *= freezing_rate * melting_time_scale;
                 depletion_change *= freezing_rate * melting_time_scale;
+              }
+              // Smooth the melt-freeze boundary where equil_melt_fraction ~ maximum_melt_fraction
+              if(melt_freeze_smoothing_width>0)
+              {
+                const double mf_smoothing = std::tanh(std::abs(porosity_change) /(0.5*melt_freeze_smoothing_width));
+                porosity_change  *= mf_smoothing;
+                depletion_change *= mf_smoothing;
               }
             }
 
@@ -498,6 +515,12 @@ namespace aspect
                           "defines how fast freezing occurs with respect to melting (if the "
                           "product is 0.5, melting will occur twice as fast as freezing). "
                           "Units: 1/yr or 1/s, depending on the ``Use years instead of seconds'' parameter.");
+        prm.declare_entry("Melting-freezing smoothing width", "0.0",
+                          Patterns::Double(0.),
+                          "Smooth transition between melting and freezing using tanh over this width of "
+                          "melt fraction to reduce-cell-to cell varations, including those associated with "
+                          "a potential sharp change in reaction_rate when the equilibrium melt fraciton is 0"
+                          "but porosity is non-zero.")
         prm.declare_entry("Melting time scale for operator splitting", "1e3",
                           Patterns::Double(0.),
                           "Because the operator splitting scheme is used, the porosity field can not "
@@ -595,6 +618,7 @@ namespace aspect
         AssertThrow(!fractional_melting,
               ExcMessage("Fractional melting is not supported."));
         freezing_rate = prm.get_double("Freezing rate");
+        melt_freeze_smoothing_width = prm.get_double("Melting-freezing smoothing width");
         melting_time_scale = prm.get_double("Melting time scale for operator splitting");
         melt_bulk_modulus_derivative = prm.get_double("Melt bulk modulus derivative");
         depletion_solidus_change = prm.get_double("Depletion solidus change");

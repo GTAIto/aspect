@@ -131,6 +131,7 @@ namespace aspect
         double depletion_solidus_change;
         bool fractional_melting;
         double freezing_rate;
+        double melt_freeze_smoothing_width;
         double melting_time_scale;
         double reference_permeability;
         double permeability_porosity_exponent_n;
