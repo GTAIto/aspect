@@ -184,30 +184,20 @@ namespace aspect
 
               //We assume that if the equilibrium depletion = 0, then if there is melt, it should freeze. 
               if (eq_melt_fraction<= 0)
-                porosity_change=-mass_of_melt/solid_density;
-              //To mitigate a potential discontinuity eq_melt_fraction=0, where melt is present
-              //taper between mass_of_melt/solid_density and (eq_melt_fraction - maximum_melt_fraction) over
-              //melt_freeze_smoothing_width. 
-              else if (eq_melt_fraction < melt_freeze_smoothing_width && melt_freeze_smoothing_width > 0)
-              {
-                const double t = eq_melt_fraction/melt_freeze_smoothing_width;
-                const double near_solidus_smoothing =  t*t*t*t*(15.0 - 24*t +10*t*t);
-                porosity_change = (1.0 - near_solidus_smoothing) * (-mass_of_melt/solid_density)
-                                  + near_solidus_smoothing * (eq_melt_fraction - maximum_melt_fraction);
-              }
+                porosity_change=-std::max(mass_of_melt,0.0)/solid_density;
               // remove melt that gets near the extraction_depth
               else if (this->get_geometry_model().depth(in.position[i]) < extraction_depth)
                 porosity_change =-mass_of_melt/solid_density * \
-                                 (in.position[i](1) - (this->get_geometry_model().maximal_depth() - extraction_depth)) / extraction_depth;
+                                 (in.position[i](1) - (this->get_geometry_model().maximal_depth() - extraction_depth)) / extraction_depth;           
               else
                 porosity_change =  (eq_melt_fraction - maximum_melt_fraction);   
 
               //If there is freezing, then it can't exceed the amount of melt present
-              porosity_change = std::max(porosity_change,-mass_of_melt/solid_density); 
+              porosity_change = std::max(porosity_change,-std::max(mass_of_melt,0.0)/solid_density); 
 
               //Dont allow peridotite to be negative (melt_fraction returns eq_melt_fraction >/=0)
               depletion_change =  std::max(porosity_change,(eq_melt_fraction - maximum_melt_fraction)); 
-
+              //depletion_change =  porosity_change;
               // optional magma extraction channel
               const bool in_magma_extraction_channel = (magma_extraction_channel_indicator_function.value(in.position[i]) > 0.5) && in.temperature[i] <= channel_base_temperature;
 
@@ -225,15 +215,6 @@ namespace aspect
               {
                 porosity_change *= freezing_rate * melting_time_scale;
                 depletion_change *= freezing_rate * melting_time_scale;
-              }
-              // Smooth the melt-freeze boundary. The polynomial =0 and has 0 slope at t=0 and provides a smooth rise
-              // and taper to 1 over melt_freeze_smoothing_width
-              if(melt_freeze_smoothing_width>0)
-              {
-                const double t = std::min(std::abs(porosity_change) /(melt_freeze_smoothing_width), 1.0);
-                const double mf_smoothing = t*t*t*t*(15.0 - 24*t +10*t*t);
-                porosity_change  *= mf_smoothing;
-                depletion_change *= mf_smoothing;
               }
             }
 
@@ -519,12 +500,6 @@ namespace aspect
                           "defines how fast freezing occurs with respect to melting (if the "
                           "product is 0.5, melting will occur twice as fast as freezing). "
                           "Units: 1/yr or 1/s, depending on the ``Use years instead of seconds'' parameter.");
-        prm.declare_entry("Melting-freezing smoothing width", "0.0",
-                          Patterns::Double(0.),
-                          "Smooth transition between melting and freezing using tanh over this width of "
-                          "melt fraction to reduce-cell-to cell varations, including those associated with "
-                          "a potential sharp change in reaction_rate when the equilibrium melt fraction is 0"
-                          "but porosity is non-zero.");
         prm.declare_entry("Melting time scale for operator splitting", "1e3",
                           Patterns::Double(0.),
                           "Because the operator splitting scheme is used, the porosity field can not "
