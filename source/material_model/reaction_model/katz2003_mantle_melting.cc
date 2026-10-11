@@ -597,7 +597,6 @@ namespace aspect
         AssertThrow(!fractional_melting,
               ExcMessage("Fractional melting is not supported."));
         freezing_rate = prm.get_double("Freezing rate");
-        melt_freeze_smoothing_width = prm.get_double("Melting-freezing smoothing width");
         melting_time_scale = prm.get_double("Melting time scale for operator splitting");
         melt_bulk_modulus_derivative = prm.get_double("Melt bulk modulus derivative");
         depletion_solidus_change = prm.get_double("Depletion solidus change");
