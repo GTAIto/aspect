@@ -186,7 +186,10 @@ namespace aspect
               if (eq_melt_fraction<= 0)
                 //freeze the melt present, but if old_porosity<0 there will be melting and this
                 //can diminish oscillations in peridotite due to advection below the solidus.
-                porosity_change = -mass_of_melt/solid_density;
+                //porosity_change = -mass_of_melt/solid_density;
+                
+                //freeze only if porosity >0
+                porosity_change =-std::max(mass_of_melt,0.0)/solid_density;
 
                 //porosity_change=-std::max(mass_of_melt,0.0)/solid_density;
               // remove melt that gets near the extraction_depth
@@ -198,9 +201,9 @@ namespace aspect
 
               //If there is freezing, then it can't exceed the amount of melt present, and there will
               //be melting if oscillations due to advection lead to old_porosity<0.
-              porosity_change = std::max(porosity_change,-mass_of_melt/solid_density);  
+              //porosity_change = std::max(porosity_change,-mass_of_melt/solid_density);  
 
-              //porosity_change = std::max(porosity_change,-std::max(mass_of_melt,0.0)/solid_density);
+              porosity_change = std::max(porosity_change,-std::max(mass_of_melt,0.0)/solid_density);
 
               //Dont allow peridotite to be negative (melt_fraction returns eq_melt_fraction >/=0)
               depletion_change =  std::max(porosity_change,(eq_melt_fraction - maximum_melt_fraction)); 
