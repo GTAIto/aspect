@@ -236,7 +236,6 @@ namespace aspect
               // fill reaction rate outputs, scaled by melting rate
               if (reaction_rate_out != nullptr && in.requests_property(MaterialProperties::reaction_rates))
               {
-                const double depth = this->get_geometry_model().depth(in.position[i]);
                 if (c == peridotite_idx && this->get_timestep_number() > 0)
                   reaction_rate_out->reaction_rates[i][c] = depletion_change / melting_time_scale;
                 else if (c == porosity_idx && this->get_timestep_number() > 0)
