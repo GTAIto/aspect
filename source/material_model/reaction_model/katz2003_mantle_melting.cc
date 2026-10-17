@@ -199,14 +199,15 @@ namespace aspect
               //If there is freezing, then it can't exceed the amount of melt present, and there will
               //be melting if oscillations due to advection lead to old_porosity<0.
               porosity_change = std::max(porosity_change,-mass_of_melt/solid_density);  
+
               //porosity_change = std::max(porosity_change,-std::max(mass_of_melt,0.0)/solid_density);
 
               //Dont allow peridotite to be negative (melt_fraction returns eq_melt_fraction >/=0)
-              //depletion_change =  std::max(porosity_change,(eq_melt_fraction - maximum_melt_fraction)); 
+              depletion_change =  std::max(porosity_change,(eq_melt_fraction - maximum_melt_fraction)); 
 
               //depletion can be negative if old_porosity large enough. But this can diminish small oscillations
               //in peridotite due to advection below the solidus. 
-              depletion_change =  porosity_change;
+              //depletion_change =  porosity_change;
 
               // optional magma extraction channel
               const bool in_magma_extraction_channel = (magma_extraction_channel_indicator_function.value(in.position[i]) > 0.5) && in.temperature[i] <= channel_base_temperature;
